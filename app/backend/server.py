@@ -1,254 +1,306 @@
-"""FastAPI server for Face Hallucination System."""
+"""
+FastAPI Server — ANFIS-LLFSR System
+=====================================
 
-from fastapi import FastAPI, APIRouter, File, UploadFile, HTTPException
-from fastapi.responses import Response
-from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
-import logging
-from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import List, Optional
-import uuid
-from datetime import datetime
-import torch
-import cv2
-import numpy as np
-from PIL import Image
+Exposes the 5-stage pipeline as REST endpoints.
+
+Endpoints:
+    GET  /api/health            — Server status + model info
+    POST /api/enhance           — Upload image, get all stage outputs
+    POST /api/darkness          — Darkness factor only (for demo)
+    GET  /api/pipeline/info     — Pipeline architecture info
+    POST /api/batch             — Batch process multiple images
+"""
+
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import io
 import base64
+import time
+from pathlib import Path
+from typing import Optional, List
 
-# Import face hallucination pipeline
-try:
-    from inference import FaceHallucinationPipeline
-    PIPELINE_AVAILABLE = True
-except Exception as e:
-    print(f"Warning: Could not import pipeline: {e}")
-    PIPELINE_AVAILABLE = False
+import numpy as np
+import cv2
+from PIL import Image
 
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+# Pipeline import
+from inference import ANFISFaceSRPipeline
 
-# MongoDB connection
-mongo_url = os.environ.get('MONGO_URL')
-if mongo_url:
-    client = AsyncIOMotorClient(mongo_url)
-    db = client[os.environ.get('DB_NAME', 'face_hallucination')]
-else:
-    client = None
-    db = None
-    print("Warning: MongoDB not configured")
-
-# FastAPI app
-app = FastAPI(title="Face Hallucination API", version="1.0.0")
-api_router = APIRouter(prefix="/api")
-
-# Lazy-loaded pipeline
-pipeline = None
-
-
-def get_pipeline():
-    """Get or initialize the face hallucination pipeline."""
-    global pipeline
-
-    if pipeline is None:
-        if not PIPELINE_AVAILABLE:
-            return None
-
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        print(f"Initializing Face Hallucination Pipeline on {device}...")
-
-        pipeline = FaceHallucinationPipeline(device=device, use_enhancer=True)
-
-        try:
-            pipeline.load_pretrained_models()
-        except Exception as e:
-            print(f"Could not load pretrained models: {e}")
-            print("Using randomly initialized weights (for demo)")
-
-    return pipeline
-
-
-# =====================
-# Pydantic Models
-# =====================
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
-
-class EnhancementResult(BaseModel):
-    success: bool
-    message: str
-    sr_image_base64: Optional[str] = None
-    enhanced_image_base64: Optional[str] = None
-    input_dimensions: Optional[dict] = None
-    output_dimensions: Optional[dict] = None
-
-
-class ModelInfo(BaseModel):
-    device: str
-    enhancer_enabled: bool
-    generator_type: str
-    upscale_factor: str
-    status: str
-
-
-# =====================
-# Routes
-# =====================
-@api_router.get("/")
-async def root():
-    return {
-        "message": "Face Hallucination API",
-        "version": "1.0.0",
-        "endpoints": {
-            "health": "/api/health",
-            "model_info": "/api/model-info",
-            "enhance": "/api/enhance"
-        }
-    }
-
-
-@api_router.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "pipeline_available": PIPELINE_AVAILABLE,
-        "pipeline_initialized": pipeline is not None,
-        "device": "cuda" if torch.cuda.is_available() else "cpu",
-        "mongodb_connected": db is not None
-    }
-
-
-@api_router.get("/model-info", response_model=ModelInfo)
-async def model_info():
-    pipe = get_pipeline()
-    if pipe is None:
-        raise HTTPException(status_code=503, detail="Pipeline not available")
-
-    info = pipe.get_model_info()
-    info['status'] = 'ready'
-    return info
-
-
-@api_router.post("/enhance", response_model=EnhancementResult)
-async def enhance_image(file: UploadFile = File(...)):
-    pipe = get_pipeline()
-    if pipe is None:
-        return EnhancementResult(success=False, message="Pipeline unavailable")
-
-    try:
-        contents = await file.read()
-        nparr = np.frombuffer(contents, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-        if image is None:
-            raise HTTPException(status_code=400, detail="Invalid image")
-
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        h, w = image.shape[:2]
-
-        results = pipe.enhance_and_super_resolve(image)
-        sr_image = results['sr_image']
-        enhanced_image = results['enhanced_image']
-
-        oh, ow = sr_image.shape[:2]
-
-        def to_base64(img):
-            buf = io.BytesIO()
-            Image.fromarray(img).save(buf, format='PNG')
-            return base64.b64encode(buf.getvalue()).decode()
-
-        return EnhancementResult(
-            success=True,
-            message="Image enhanced successfully",
-            sr_image_base64=to_base64(sr_image),
-            enhanced_image_base64=to_base64(enhanced_image),
-            input_dimensions={"width": w, "height": h},
-            output_dimensions={"width": ow, "height": oh}
-        )
-
-    except Exception as e:
-        logging.exception("Enhancement failed")
-        return EnhancementResult(success=False, message=str(e))
-
-
-@api_router.post("/enhance-binary")
-async def enhance_image_binary(file: UploadFile = File(...)):
-    pipe = get_pipeline()
-    if pipe is None:
-        raise HTTPException(status_code=503, detail="Pipeline unavailable")
-
-    contents = await file.read()
-    nparr = np.frombuffer(contents, np.uint8)
-    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-    if image is None:
-        raise HTTPException(status_code=400, detail="Invalid image")
-
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    sr_image = pipe.enhance_and_super_resolve(image)['sr_image']
-
-    buf = io.BytesIO()
-    Image.fromarray(sr_image).save(buf, format='PNG')
-    buf.seek(0)
-
-    return Response(content=buf.getvalue(), media_type="image/png")
-
-
-# MongoDB demo endpoints
-if db is not None:
-    @api_router.post("/status", response_model=StatusCheck)
-    async def create_status_check(input: StatusCheckCreate):
-        status = StatusCheck(**input.dict())
-        await db.status_checks.insert_one(status.dict())
-        return status
-
-    @api_router.get("/status", response_model=List[StatusCheck])
-    async def get_status_checks():
-        docs = await db.status_checks.find().to_list(1000)
-        return [StatusCheck(**d) for d in docs]
-
-
-# =====================
-# App setup
-# =====================
-app.include_router(api_router)
+# ─── App Setup ─────────────────────────────────────────────────────────
+app = FastAPI(
+    title="ANFIS Low-Light Face Super-Resolution API",
+    description="Neuro-Fuzzy Inferencing Based System for improving dark/low-res face images.",
+    version="1.0.0",
+    docs_url="/api/docs",
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-
+# ─── Global Pipeline (loaded once at startup) ───────────────────────────
+pipeline: Optional[ANFISFaceSRPipeline] = None
 
 @app.on_event("startup")
 async def startup_event():
-    logging.info("Face Hallucination API starting up")
+    global pipeline
+    print("Loading ANFIS pipeline...")
+    pipeline = ANFISFaceSRPipeline(
+        device='cpu',
+        use_blur_correction=True,
+        use_lcr=True,
+        use_regression=True,
+        use_rrdb=True,
+    )
+    pipeline.load_pretrained(checkpoint_dir='checkpoints')
+    print("Pipeline ready.")
 
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    if client:
-        client.close()
-    logging.info("Shutting down")
+# ─── Helper: image IO ──────────────────────────────────────────────────
+
+def decode_upload(file_bytes: bytes) -> np.ndarray:
+    """Decode uploaded file bytes to uint8 RGB numpy array."""
+    nparr = np.frombuffer(file_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise HTTPException(status_code=422, detail="Cannot decode image.")
+    return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 
-if __name__ == '__main__':
+def encode_image(img_f: np.ndarray) -> str:
+    """Encode float32 [H,W,3] image to base64 PNG string."""
+    img_u8 = (np.clip(img_f, 0, 1) * 255).astype(np.uint8)
+    img_bgr = cv2.cvtColor(img_u8, cv2.COLOR_RGB2BGR)
+    _, buf = cv2.imencode('.png', img_bgr)
+    return base64.b64encode(buf.tobytes()).decode('utf-8')
+
+
+def encode_uint8(img_u8: np.ndarray) -> str:
+    """Encode uint8 [H,W,3] image to base64 PNG string."""
+    img_bgr = cv2.cvtColor(img_u8, cv2.COLOR_RGB2BGR)
+    _, buf = cv2.imencode('.png', img_bgr)
+    return base64.b64encode(buf.tobytes()).decode('utf-8')
+
+
+# ─── Response Models ───────────────────────────────────────────────────
+
+class HealthResponse(BaseModel):
+    status: str
+    pipeline_ready: bool
+    n_anfis_rules: int
+    device: str
+    stages: list
+
+class EnhanceResponse(BaseModel):
+    status: str
+    processing_time_ms: float
+    darkness_factor: float
+    darkness_interpretation: str
+    blur_severity: float
+    blur_corrected: bool
+    # Base64-encoded PNG images for each stage
+    input_image: str
+    deblurred_image: str
+    enhanced_image: str
+    lcr_output: str
+    final_image: str
+    # Metadata
+    input_size: list
+    output_size: list
+
+class DarknessResponse(BaseModel):
+    darkness_factor: float
+    interpretation: str
+    features: dict
+
+class BatchEnhanceResponse(BaseModel):
+    status: str
+    results: list
+    total_time_ms: float
+
+
+# ─── Endpoints ─────────────────────────────────────────────────────────
+
+@app.get("/api/health", response_model=HealthResponse)
+async def health():
+    """Health check — confirms pipeline is loaded."""
+    global pipeline
+    if pipeline is None:
+        return HealthResponse(
+            status="initialising",
+            pipeline_ready=False,
+            n_anfis_rules=0,
+            device="cpu",
+            stages=[],
+        )
+    info = pipeline.get_pipeline_info()
+    return HealthResponse(
+        status="ok",
+        pipeline_ready=True,
+        n_anfis_rules=info['n_anfis_rules'],
+        device=info['device'],
+        stages=info['stages'],
+    )
+
+
+@app.post("/api/enhance", response_model=EnhanceResponse)
+async def enhance(file: UploadFile = File(...)):
+    """Upload a low-light face image and get all pipeline stage outputs.
+
+    Returns base64-encoded PNG images for:
+        - Input (original)
+        - After motion blur correction (Stage 2)
+        - After Zero-DCE enhancement (Stage 3a)
+        - After ANFIS-LCR hallucination (Stage 3b)
+        - Final output (after RRDB, Stage 5)
+
+    Also returns the ANFIS Darkness Factor (DF) and blur metadata.
+    """
+    global pipeline
+    if pipeline is None:
+        raise HTTPException(status_code=503, detail="Pipeline not ready.")
+
+    file_bytes = await file.read()
+    img_rgb    = decode_upload(file_bytes)
+
+    t_start = time.perf_counter()
+    try:
+        results = pipeline.enhance(img_rgb, target_size=128)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
+    elapsed_ms = (time.perf_counter() - t_start) * 1000
+
+    df = results['darkness_factor']
+    if df < 0.2:
+        interp = "Well-lit — minimal enhancement"
+    elif df < 0.5:
+        interp = "Moderately dark — moderate enhancement"
+    elif df < 0.75:
+        interp = "Dark — strong enhancement"
+    else:
+        interp = "Extremely dark — maximum enhancement"
+
+    blur_info = results.get('blur_info', {})
+
+    # Encode all stage images to base64
+    input_b64     = encode_uint8(results['input'])
+    deblurred_b64 = encode_image(results.get('deblurred', results['input'].astype(np.float32)/255))
+    enhanced_b64  = encode_image(results.get('enhanced', results['input'].astype(np.float32)/255))
+    lcr_b64       = encode_image(results.get('lcr_output', results['input'].astype(np.float32)/255))
+    final_b64     = encode_uint8(results['final_uint8'])
+
+    return EnhanceResponse(
+        status="success",
+        processing_time_ms=round(elapsed_ms, 2),
+        darkness_factor=round(float(df), 4),
+        darkness_interpretation=interp,
+        blur_severity=round(float(blur_info.get('blur_severity', 0)), 4),
+        blur_corrected=bool(blur_info.get('corrected', False)),
+        input_image=input_b64,
+        deblurred_image=deblurred_b64,
+        enhanced_image=enhanced_b64,
+        lcr_output=lcr_b64,
+        final_image=final_b64,
+        input_size=list(results['input'].shape[:2]),
+        output_size=list(results['final_uint8'].shape[:2]),
+    )
+
+
+@app.post("/api/darkness", response_model=DarknessResponse)
+async def estimate_darkness(file: UploadFile = File(...)):
+    """Estimate the Darkness Factor of an uploaded image using ANFIS.
+
+    Returns DF ∈ [0, 1], an interpretation, and the 4 illumination features.
+    Useful for demonstrating Paper 3 contribution in isolation.
+    """
+    global pipeline
+    if pipeline is None:
+        raise HTTPException(status_code=503, detail="Pipeline not ready.")
+
+    file_bytes = await file.read()
+    img_rgb    = decode_upload(file_bytes)
+
+    if not pipeline.darkness_estimator._trained:
+        # Heuristic fallback
+        df     = 1.0 - float(img_rgb.mean() / 255.0)
+        feats  = {}
+        interp = "ANFIS not trained — heuristic estimate"
+    else:
+        desc   = pipeline.darkness_estimator.describe_prediction(img_rgb)
+        df     = desc['darkness_factor']
+        feats  = {k: round(v, 4) for k, v in desc['features'].items()}
+        interp = desc['interpretation']
+
+    return DarknessResponse(
+        darkness_factor=round(float(df), 4),
+        interpretation=interp,
+        features=feats,
+    )
+
+
+@app.get("/api/pipeline/info")
+async def pipeline_info():
+    """Return complete pipeline architecture information."""
+    global pipeline
+    if pipeline is None:
+        raise HTTPException(status_code=503, detail="Pipeline not ready.")
+    return pipeline.get_pipeline_info()
+
+
+@app.post("/api/batch")
+async def batch_enhance(files: List[UploadFile] = File(...)):
+    """Process multiple images in batch.
+
+    Returns a list of results (one per image) with final image and DF.
+    """
+    global pipeline
+    if pipeline is None:
+        raise HTTPException(status_code=503, detail="Pipeline not ready.")
+
+    if len(files) > 10:
+        raise HTTPException(status_code=422, detail="Max 10 images per batch.")
+
+    t_start = time.perf_counter()
+    batch_results = []
+
+    for f in files:
+        try:
+            fb     = await f.read()
+            img    = decode_upload(fb)
+            res    = pipeline.enhance(img, target_size=128)
+            batch_results.append({
+                "filename": f.filename,
+                "darkness_factor": round(float(res['darkness_factor']), 4),
+                "final_image": encode_uint8(res['final_uint8']),
+                "status": "success",
+            })
+        except Exception as e:
+            batch_results.append({
+                "filename": f.filename,
+                "status": "error",
+                "error": str(e),
+            })
+
+    total_ms = (time.perf_counter() - t_start) * 1000
+    return BatchEnhanceResponse(
+        status="success",
+        results=batch_results,
+        total_time_ms=round(total_ms, 2),
+    )
+
+
+# ─── Run ───────────────────────────────────────────────────────────────
+if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8001)
+    uvicorn.run("server:app", host="0.0.0.0", port=8001, reload=False)
