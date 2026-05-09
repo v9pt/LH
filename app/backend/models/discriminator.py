@@ -1,126 +1,35 @@
-"""PatchGAN Discriminator for adversarial training."""
-
 import torch
 import torch.nn as nn
 
-
-class PatchGANDiscriminator(nn.Module):
-    """PatchGAN discriminator for realistic texture generation.
-    
-    Outputs a matrix of real/fake predictions for overlapping patches.
-    """
-    
-    def __init__(self, in_channels=3, ndf=64, n_layers=3):
-        """Initialize discriminator.
-        
-        Args:
-            in_channels: Input channels (3 for RGB)
-            ndf: Base number of discriminator filters
-            n_layers: Number of layers
-        """
-        super(PatchGANDiscriminator, self).__init__()
-        
-        layers = []
-        
-        # First layer (no normalization)
-        layers.append(nn.Conv2d(in_channels, ndf, kernel_size=4, stride=2, padding=1))
+class DiscriminatorBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=2, normalize=True):
+        super(DiscriminatorBlock, self).__init__()
+        layers = [nn.Conv2d(in_channels, out_channels, kernel_size=4, stride=stride, padding=1, bias=False)]
+        if normalize:
+            layers.append(nn.BatchNorm2d(out_channels))
         layers.append(nn.LeakyReLU(0.2, inplace=True))
-        
-        # Intermediate layers
-        nf_mult = 1
-        for n in range(1, n_layers):
-            nf_mult_prev = nf_mult
-            nf_mult = min(2 ** n, 8)
-            layers.append(nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, 
-                                   kernel_size=4, stride=2, padding=1))
-            layers.append(nn.BatchNorm2d(ndf * nf_mult))
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
-        
-        # Final layers
-        nf_mult_prev = nf_mult
-        nf_mult = min(2 ** n_layers, 8)
-        layers.append(nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult,
-                               kernel_size=4, stride=1, padding=1))
-        layers.append(nn.BatchNorm2d(ndf * nf_mult))
-        layers.append(nn.LeakyReLU(0.2, inplace=True))
-        
-        # Output layer
-        layers.append(nn.Conv2d(ndf * nf_mult, 1, kernel_size=4, stride=1, padding=1))
-        
         self.model = nn.Sequential(*layers)
-    
+
     def forward(self, x):
-        """Forward pass.
-        
-        Args:
-            x: Input image [B, 3, H, W]
-            
-        Returns:
-            Patch predictions [B, 1, H', W']
-        """
         return self.model(x)
 
-
-"""PatchGAN Discriminator for adversarial training."""
-
-import torch
-import torch.nn as nn
-
-
 class PatchGANDiscriminator(nn.Module):
-    """PatchGAN discriminator for realistic texture generation.
-    
-    Outputs a matrix of real/fake predictions for overlapping patches.
     """
-    
-    def __init__(self, in_channels=3, ndf=64, n_layers=3):
-        """Initialize discriminator.
-        
-        Args:
-            in_channels: Input channels (3 for RGB)
-            ndf: Base number of discriminator filters
-            n_layers: Number of layers
-        """
+    PatchGAN Discriminator.
+    Classifies NxN image patches as real or fake, rather than the whole image.
+    Crucial for pushing the NIQE score below 5 (high naturalness) and preventing blur.
+    """
+    def __init__(self, in_channels=3, features=64):
         super(PatchGANDiscriminator, self).__init__()
-        
-        layers = []
-        
-        # First layer (no normalization)
-        layers.append(nn.Conv2d(in_channels, ndf, kernel_size=4, stride=2, padding=1))
-        layers.append(nn.LeakyReLU(0.2, inplace=True))
-        
-        # Intermediate layers
-        nf_mult = 1
-        for n in range(1, n_layers):
-            nf_mult_prev = nf_mult
-            nf_mult = min(2 ** n, 8)
-            layers.append(nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, 
-                                   kernel_size=4, stride=2, padding=1))
-            layers.append(nn.BatchNorm2d(ndf * nf_mult))
-            layers.append(nn.LeakyReLU(0.2, inplace=True))
-        
-        # Final layers
-        nf_mult_prev = nf_mult
-        nf_mult = min(2 ** n_layers, 8)
-        layers.append(nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult,
-                               kernel_size=4, stride=1, padding=1))
-        layers.append(nn.BatchNorm2d(ndf * nf_mult))
-        layers.append(nn.LeakyReLU(0.2, inplace=True))
-        
-        # Output layer
-        layers.append(nn.Conv2d(ndf * nf_mult, 1, kernel_size=4, stride=1, padding=1))
-        
-        self.model = nn.Sequential(*layers)
-    
+
+        # Input: [B, 3, H, W]
+        self.model = nn.Sequential(
+            DiscriminatorBlock(in_channels, features, normalize=False),      # [B, 64, H/2, W/2]
+            DiscriminatorBlock(features, features * 2),                      # [B, 128, H/4, W/4]
+            DiscriminatorBlock(features * 2, features * 4),                  # [B, 256, H/8, W/8]
+            DiscriminatorBlock(features * 4, features * 8, stride=1),        # [B, 512, H/8, W/8]
+            nn.Conv2d(features * 8, 1, kernel_size=4, stride=1, padding=1)   # [B, 1, H/8-1, W/8-1]
+        )
+
     def forward(self, x):
-        """Forward pass.
-        
-        Args:
-            x: Input image [B, 3, H, W]
-            
-        Returns:
-            Patch predictions [B, 1, H', W']
-        """
         return self.model(x)
-
-

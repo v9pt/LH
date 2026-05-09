@@ -22,13 +22,17 @@ class FaceSRDataset(Dataset):
         """Initialize dataset.
         
         Args:
-            image_dir: Directory containing HR face images
+            image_dir: Directory or list of directories containing HR face images
             image_degrader: ImageDegrader instance
             hr_size: Size of HR images (will be resized)
             augment: Whether to apply data augmentation
             max_images: Maximum number of images to load (None for all)
         """
-        self.image_dir = Path(image_dir)
+        if isinstance(image_dir, (list, tuple)):
+            self.image_dirs = [Path(d) for d in image_dir]
+        else:
+            self.image_dirs = [Path(image_dir)]
+        
         self.degrader = image_degrader
         self.hr_size = hr_size
         
@@ -46,13 +50,15 @@ class FaceSRDataset(Dataset):
             self.transform = None
     
     def _get_image_paths(self, max_images=None):
-        """Get list of image paths."""
+        """Get list of image paths from all directories."""
         extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
         paths = []
         
         for ext in extensions:
-            paths.extend(self.image_dir.glob(f'*{ext}'))
-            paths.extend(self.image_dir.glob(f'*{ext.upper()}'))
+            for d in self.image_dirs:
+                if d.exists():
+                    paths.extend(d.glob(f'*{ext}'))
+                    paths.extend(d.glob(f'*{ext.upper()}'))
         
         paths = sorted(paths)
         

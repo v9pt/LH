@@ -27,6 +27,7 @@ interface EnhanceResponse {
   final_image: string;
   input_size: number[];
   output_size: number[];
+  scale_factor: number;
 }
 
 // ── Helper ─────────────────────────────────────────────────────────────────
@@ -66,10 +67,8 @@ function DarknessGauge({ value, label }: { value: number; label: string }) {
 const PIPELINE_STAGES = [
   { id: 1,   name: "ANFIS Darkness Estimation", paper: "Paper 3", icon: Brain },
   { id: 2,   name: "Blur Correction",           paper: "Paper 5", icon: Eye },
-  { id: "3a",name: "Zero-DCE Enhancement",      paper: "Paper 2", icon: Zap },
-  { id: "3b",name: "ANFIS-LCR Hallucination",   paper: "Paper 1", icon: Layers },
-  { id: 4,   name: "Regression Blending",       paper: "Paper 4", icon: Brain },
-  { id: 5,   name: "RRDB Refinement",           paper: "ESRGAN",  icon: Wand2 },
+  { id: 3,   name: "Zero-DCE Enhancement",      paper: "Paper 2", icon: Zap },
+  { id: 4,   name: "VQ-Codebook Face SR",       paper: "GFPGAN",  icon: Layers },
 ];
 
 function PipelineVisualizer({ activeStage }: { activeStage: number }) {
@@ -144,7 +143,12 @@ function StageGrid({ stages }: { stages: StageResult[] }) {
 }
 
 // ── Before/After Slider ────────────────────────────────────────────────────
-function BeforeAfterSlider({ before, after }: { before: string; after: string }) {
+function BeforeAfterSlider({ before, after, inputSize, outputSize }: {
+  before: string;
+  after: string;
+  inputSize: number[];
+  outputSize: number[];
+}) {
   const [pct, setPct] = useState(50);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -163,7 +167,13 @@ function BeforeAfterSlider({ before, after }: { before: string; after: string })
       onTouchMove={(e) => onMove(e.touches[0].clientX)}
       data-testid="before-after-slider"
     >
-      <img src={`data:image/png;base64,${before}`} alt="Before" className="slider-img" />
+      {/* LR input: rendered with pixelated scaling so it looks like a genuine LR image */}
+      <img
+        src={`data:image/png;base64,${before}`}
+        alt="Before"
+        className="slider-img"
+        style={{ imageRendering: "pixelated", objectFit: "contain" }}
+      />
       <div className="slider-after-wrap" style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}>
         <img src={`data:image/png;base64,${after}`} alt="After" className="slider-img" />
       </div>
@@ -171,17 +181,24 @@ function BeforeAfterSlider({ before, after }: { before: string; after: string })
         <div className="slider-line" />
         <div className="slider-knob">‹ ›</div>
       </div>
-      <div className="slider-label left">Input</div>
-      <div className="slider-label right">Output</div>
+      <div className="slider-label left">
+        Input
+        <span className="slider-size-badge">{inputSize[0]}×{inputSize[1]}</span>
+      </div>
+      <div className="slider-label right">
+        Output
+        <span className="slider-size-badge">{outputSize[0]}×{outputSize[1]}</span>
+      </div>
     </div>
   );
 }
 
 // ── Metrics Bar ─────────────────────────────────────────────────────────────
-function MetricsBar({ df, blur, time, inputSize, outputSize, blurCorrected }: {
+function MetricsBar({ df, blur, time, inputSize, outputSize, blurCorrected, scaleFactor }: {
   df: number; blur: number; time: number;
   inputSize: number[]; outputSize: number[];
   blurCorrected: boolean;
+  scaleFactor: number;
 }) {
   return (
     <div className="metrics-bar" data-testid="metrics-bar">
@@ -195,11 +212,15 @@ function MetricsBar({ df, blur, time, inputSize, outputSize, blurCorrected }: {
       </div>
       <div className="metric-chip">
         <span className="metric-label">Input Size</span>
-        <span className="metric-val">{inputSize[0]}×{inputSize[1]}</span>
+        <span className="metric-val">{inputSize[1]}×{inputSize[0]}</span>
       </div>
       <div className="metric-chip">
         <span className="metric-label">Output Size</span>
-        <span className="metric-val">{outputSize[0]}×{outputSize[1]}</span>
+        <span className="metric-val">{outputSize[1]}×{outputSize[0]}</span>
+      </div>
+      <div className="metric-chip">
+        <span className="metric-label">Scale Factor</span>
+        <span className="metric-val">{scaleFactor}×</span>
       </div>
       <div className="metric-chip">
         <span className="metric-label">Processing</span>
@@ -279,11 +300,11 @@ export default function ImageUploader() {
       image: result.input_image, active: true },
     { id: 2,   name: "Motion Blur Corrected", paper: "Paper 5",
       image: result.deblurred_image, active: true },
-    { id: "3a",name: "Zero-DCE Enhanced",     paper: "Paper 2",
+    { id: 3,   name: "Zero-DCE Enhanced",     paper: "Paper 2",
       image: result.enhanced_image, active: true },
-    { id: "3b",name: "ANFIS-LCR Hallucinated",paper: "Paper 1",
-      image: result.lcr_output, active: true },
-    { id: "Out",name: "Final HR Output",       paper: "Papers 1–5",
+    { id: 4,   name: "VQ-Codebook Face SR",   paper: "GFPGAN",
+      image: result.final_image, active: true },
+    { id: "Out",name: "Final HR Output",       paper: "Pipeline",
       image: result.final_image, active: true },
   ] : [];
 
@@ -358,6 +379,7 @@ export default function ImageUploader() {
             inputSize={result.input_size}
             outputSize={result.output_size}
             blurCorrected={result.blur_corrected}
+            scaleFactor={result.scale_factor ?? 8}
           />
 
           {/* Darkness gauge */}
@@ -365,7 +387,12 @@ export default function ImageUploader() {
 
           {/* Before/after slider */}
           <h4 className="section-label">Before / After</h4>
-          <BeforeAfterSlider before={result.input_image} after={result.final_image} />
+          <BeforeAfterSlider
+            before={result.input_image}
+            after={result.final_image}
+            inputSize={result.input_size}
+            outputSize={result.output_size}
+          />
 
           {/* Stage-by-stage grid */}
           <h4 className="section-label">Pipeline Stage Outputs</h4>

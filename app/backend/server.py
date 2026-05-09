@@ -10,6 +10,8 @@ Endpoints:
     POST /api/darkness          — Darkness factor only (for demo)
     GET  /api/pipeline/info     — Pipeline architecture info
     POST /api/batch             — Batch process multiple images
+
+Scale: 8× pipeline — input resized to 64×64, output is 512×512.
 """
 
 import sys, os
@@ -59,9 +61,7 @@ async def startup_event():
     pipeline = ANFISFaceSRPipeline(
         device='cpu',
         use_blur_correction=True,
-        use_lcr=True,
-        use_regression=True,
-        use_rrdb=True,
+        use_gfpgan=True,
     )
     pipeline.load_pretrained(checkpoint_dir='checkpoints')
     print("Pipeline ready.")
@@ -116,8 +116,9 @@ class EnhanceResponse(BaseModel):
     lcr_output: str
     final_image: str
     # Metadata
-    input_size: list
-    output_size: list
+    input_size: list   # [H, W] of the LR input fed to the pipeline
+    output_size: list  # [H, W] of the final SR output
+    scale_factor: int  # upscaling factor (8 for 64→512)
 
 class DarknessResponse(BaseModel):
     darkness_factor: float
@@ -176,7 +177,8 @@ async def enhance(file: UploadFile = File(...)):
 
     t_start = time.perf_counter()
     try:
-        results = pipeline.enhance(img_rgb, target_size=128)
+        # 8× pipeline: target_size=512 → LR resized to 64×64, output=512×512
+        results = pipeline.enhance(img_rgb, target_size=512)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
     elapsed_ms = (time.perf_counter() - t_start) * 1000
@@ -200,6 +202,9 @@ async def enhance(file: UploadFile = File(...)):
     lcr_b64       = encode_image(results.get('lcr_output', results['input'].astype(np.float32)/255))
     final_b64     = encode_uint8(results['final_uint8'])
 
+    lr_h, lr_w = results['input'].shape[:2]
+    hr_h, hr_w = results['final_uint8'].shape[:2]
+
     return EnhanceResponse(
         status="success",
         processing_time_ms=round(elapsed_ms, 2),
@@ -212,8 +217,9 @@ async def enhance(file: UploadFile = File(...)):
         enhanced_image=enhanced_b64,
         lcr_output=lcr_b64,
         final_image=final_b64,
-        input_size=list(results['input'].shape[:2]),
-        output_size=list(results['final_uint8'].shape[:2]),
+        input_size=[lr_h, lr_w],
+        output_size=[hr_h, hr_w],
+        scale_factor=hr_h // lr_h if lr_h > 0 else 8,
     )
 
 

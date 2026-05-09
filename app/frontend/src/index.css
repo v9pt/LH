@@ -322,6 +322,13 @@ body {
 }
 .slider-label.left  { left: 8px; }
 .slider-label.right { right: 8px; }
+.slider-size-badge {
+  display: block;
+  font-size: .6rem;
+  color: rgba(255,255,255,.6);
+  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
 
 /* ── Stage Grid ───────────────────────────────────── */
 .stage-grid {

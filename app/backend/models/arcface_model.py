@@ -42,7 +42,7 @@ class ArcFaceModel:
         if isinstance(image, torch.Tensor):
             if image.dim() == 4:
                 image = image[0]  # Remove batch dimension
-            image = image.permute(1, 2, 0).cpu().numpy() * 255
+            image = image.detach().permute(1, 2, 0).cpu().numpy() * 255
             image = image.astype(np.uint8)
         
         # Convert RGB to BGR for InsightFace

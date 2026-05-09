@@ -31,7 +31,7 @@ class ImageDegrader:
         """
         self.scale = scale
         self.blur_kernel_size = blur_kernel_size
-        self.noise_std = noise_std
+        self.noise_std = noise_std  # Used as poisson noise scale parameter
         self.gamma_range = gamma_range
     
     def degrade(self, hr_image):
@@ -66,14 +66,22 @@ class ImageDegrader:
                 0
             )
         
-        # 3. Add noise
+        # 3. Add noise (Poisson noise for low-light simulation instead of Gaussian)
         if self.noise_std > 0:
-            noise = np.random.normal(0, self.noise_std * 255, lr_image.shape)
-            lr_image = np.clip(lr_image + noise, 0, 255).astype(np.uint8)
+            # Scale image to simulate photon counts, apply poisson, then scale back
+            scale_factor = random.uniform(10.0, 50.0) # photon scale
+            noisy = np.random.poisson(lr_image / 255.0 * scale_factor) / scale_factor * 255.0
+            lr_image = np.clip(noisy, 0, 255).astype(np.uint8)
         
         # 4. Darken (gamma correction)
         gamma = random.uniform(*self.gamma_range)
         lr_image = self._adjust_gamma(lr_image, gamma)
+        
+        # 5. Add JPEG Compression Artifacts
+        jpeg_quality = random.randint(40, 90)
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality]
+        _, encimg = cv2.imencode('.jpg', lr_image, encode_param)
+        lr_image = cv2.imdecode(encimg, 1)
         
         # Convert back to original format
         if is_tensor:

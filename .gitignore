@@ -33,6 +33,14 @@ dist/
 pretrained_models/
 logs/
 tmp/
+checkpoints/
+
+# Data and Results
+data/
+results/
+*.zip
+*.tar.gz
+*.7z
 
 # Runtime caches
 *.log
