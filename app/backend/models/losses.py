@@ -44,6 +44,32 @@ class FocalFrequencyLoss(nn.Module):
         loss = F.l1_loss(pred_mag, target_mag)
         return loss * self.alpha
 
+class EdgeLoss(nn.Module):
+    """
+    Penalizes differences in structural edges using Sobel filters.
+    Crucial for hitting high SSIM scores.
+    """
+    def __init__(self):
+        super(EdgeLoss, self).__init__()
+        k_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32).unsqueeze(0).unsqueeze(0) / 4.0
+        k_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=torch.float32).unsqueeze(0).unsqueeze(0) / 4.0
+        self.register_buffer('k_x', k_x)
+        self.register_buffer('k_y', k_y)
+
+    def forward(self, pred, target):
+        pred_gray = pred.mean(dim=1, keepdim=True)
+        target_gray = target.mean(dim=1, keepdim=True)
+        
+        pred_gx = F.conv2d(pred_gray, self.k_x, padding=1)
+        pred_gy = F.conv2d(pred_gray, self.k_y, padding=1)
+        pred_edge = torch.sqrt(pred_gx**2 + pred_gy**2 + 1e-6)
+        
+        target_gx = F.conv2d(target_gray, self.k_x, padding=1)
+        target_gy = F.conv2d(target_gray, self.k_y, padding=1)
+        target_edge = torch.sqrt(target_gx**2 + target_gy**2 + 1e-6)
+        
+        return F.l1_loss(pred_edge, target_edge)
+
 class HybridLossCombiner(nn.Module):
     """
     The Ultimate Multi-Task Loss formulation for the Swin-Fuzzy-LCR architecture.
@@ -62,11 +88,15 @@ class HybridLossCombiner(nn.Module):
         # Frequency Loss
         self.freq_loss = FocalFrequencyLoss()
         
+        # NEW: Edge Loss for structural integrity (SSIM boost)
+        self.edge_loss = EdgeLoss()
+        
         # Weights (as defined in the implementation plan)
         self.w_l1 = 1.0
         self.w_percep = 1.0
         self.w_id = 0.8
         self.w_freq = 0.1
+        self.w_edge = 0.5
         self.w_adv = 0.1 # Adversarial loss handles separately by a discriminator
 
     def forward(self, pred, target, arcface_model=None):
@@ -92,7 +122,11 @@ class HybridLossCombiner(nn.Module):
         freq = self.freq_loss(pred, target)
         loss_dict['freq'] = freq * self.w_freq
         
-        # 4. Identity Loss
+        # NEW: 4. Edge Loss
+        edge = self.edge_loss(pred, target)
+        loss_dict['edge'] = edge * self.w_edge
+        
+        # 5. Identity Loss
         if arcface_model is not None:
             # pred and target are [B, 3, H, W]
             pred_embs = arcface_model.extract_embeddings_batch(pred)

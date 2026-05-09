@@ -34,6 +34,81 @@ class SpatialFeatureTransform(nn.Module):
         # Return the feature map and the scale map (which serves as the Fuzzy Attention Heatmap)
         return out, scale
 
+class ChannelAttention(nn.Module):
+    def __init__(self, in_planes, ratio=16):
+        super(ChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        
+        self.fc1   = nn.Conv2d(in_planes, in_planes // ratio, 1, bias=False)
+        self.relu1 = nn.ReLU()
+        self.fc2   = nn.Conv2d(in_planes // ratio, in_planes, 1, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = self.fc2(self.relu1(self.fc1(self.avg_pool(x))))
+        max_out = self.fc2(self.relu1(self.fc1(self.max_pool(x))))
+        out = avg_out + max_out
+        return self.sigmoid(out)
+
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
+        assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
+        padding = 3 if kernel_size == 7 else 1
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=padding, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x_cat = torch.cat([avg_out, max_out], dim=1)
+        out = self.conv1(x_cat)
+        return self.sigmoid(out)
+
+class CBAMBlock(nn.Module):
+    """Convolutional Block Attention Module for refining facial features."""
+    def __init__(self, channels, ratio=16, kernel_size=7):
+        super(CBAMBlock, self).__init__()
+        self.ca = ChannelAttention(channels, ratio)
+        self.sa = SpatialAttention(kernel_size)
+
+    def forward(self, x):
+        x = x * self.ca(x)
+        x = x * self.sa(x)
+        return x
+
+class WaveletFusionBlock(nn.Module):
+    """
+    Fuses high-frequency details using a simplified Haar-like feature decomposition.
+    """
+    def __init__(self, channels):
+        super(WaveletFusionBlock, self).__init__()
+        # High-frequency extractor (edge-like)
+        self.hf_conv = nn.Conv2d(channels, channels, kernel_size=3, padding=1, groups=channels, bias=False)
+        # Low-frequency extractor (smooth-like)
+        self.lf_conv = nn.Conv2d(channels, channels, kernel_size=3, padding=1, groups=channels, bias=False)
+        
+        # Initialize with Haar-like approximations (Laplacian/Gaussian)
+        # We let them be learnable but initialize to encourage frequency separation
+        self.fusion = nn.Sequential(
+            nn.Conv2d(channels * 2, channels, kernel_size=1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1)
+        )
+        
+    def forward(self, x):
+        lf = F.avg_pool2d(x, kernel_size=3, stride=1, padding=1)
+        hf = x - lf
+        
+        # Process frequency bands independently
+        lf_feat = self.lf_conv(lf)
+        hf_feat = self.hf_conv(hf)
+        
+        # Fuse
+        fused = self.fusion(torch.cat([lf_feat, hf_feat], dim=1))
+        return fused + x # Residual connection
+
 
 class SwinFuzzyLCR(nn.Module):
     """
@@ -57,9 +132,19 @@ class SwinFuzzyLCR(nn.Module):
             nn.Conv2d(feature_dim, feature_dim, kernel_size=3, padding=1)
         )
         
-        # 4. LCR VQ-Codebook Projection Layer (Connecting to CodeFormer)
-        # Maps deep features to the latent space expected by the VQ-GAN
-        self.lcr_projection = nn.Conv2d(feature_dim, 256, kernel_size=1)
+        # NEW: CBAM Attention to refine facial structures
+        self.cbam = CBAMBlock(feature_dim)
+        
+        # NEW: Wavelet-Frequency Fusion for High-Frequency (texture/pores) recovery
+        self.wavelet_fusion = WaveletFusionBlock(feature_dim)
+        
+        # 4. LCR VQ-Codebook Projection Layer (Connecting to CodeFormer latent space)
+        # Modernized locality constraints
+        self.lcr_projection = nn.Sequential(
+            nn.Conv2d(feature_dim, 128, kernel_size=3, padding=1),
+            nn.LeakyReLU(0.2, True),
+            nn.Conv2d(128, 256, kernel_size=1)
+        )
         
         # 5. Output Reconstruction & Upsampling (4x)
         self.reconstruction = nn.Sequential(
@@ -82,7 +167,13 @@ class SwinFuzzyLCR(nn.Module):
         
         # Hierarchical Feature Processing (SwinIR)
         deep_feat = self.swin_blocks(feat_sft)
+        
+        # Refine with CBAM Attention
+        deep_feat = self.cbam(deep_feat)
         deep_feat = deep_feat + feat_sft # Residual connection
+        
+        # Fuse High-Frequency Wavelet details
+        deep_feat = self.wavelet_fusion(deep_feat)
         
         # Project to Locality Constrained Representation (VQ-Codebook Latent Space)
         lcr_latent = self.lcr_projection(deep_feat)
