@@ -167,15 +167,20 @@ function BeforeAfterSlider({ before, after, inputSize, outputSize }: {
       onTouchMove={(e) => onMove(e.touches[0].clientX)}
       data-testid="before-after-slider"
     >
-      {/* LR input: rendered with pixelated scaling so it looks like a genuine LR image */}
+      {/* HR output (After): rendered as the base layer underneath */}
       <img
-        src={`data:image/png;base64,${before}`}
-        alt="Before"
+        src={`data:image/png;base64,${after}`}
+        alt="After"
         className="slider-img"
-        style={{ imageRendering: "pixelated", objectFit: "contain" }}
       />
+      {/* LR input (Before): clipped on the right so it only shows on the left side of the slider */}
       <div className="slider-after-wrap" style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}>
-        <img src={`data:image/png;base64,${after}`} alt="After" className="slider-img" />
+        <img 
+          src={`data:image/png;base64,${before}`} 
+          alt="Before" 
+          className="slider-img" 
+          style={{ imageRendering: "pixelated", objectFit: "contain" }}
+        />
       </div>
       <div className="slider-handle" style={{ left: `${pct}%` }}>
         <div className="slider-line" />
