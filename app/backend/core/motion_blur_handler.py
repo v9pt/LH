@@ -25,6 +25,11 @@ from typing import Tuple, Optional
 from scipy.signal import wiener
 from skimage.transform import radon
 
+try:
+    from core.blur_analyzer import BlurAnalyzer
+except ImportError:
+    from .blur_analyzer import BlurAnalyzer
+
 
 # ─────────────────────────────────────────────────────────────
 #  Blur Kernel Estimation
@@ -131,28 +136,11 @@ def _make_motion_blur_kernel(size: int,
 
 def detect_blur_severity(image: np.ndarray,
                           threshold: float = 100.0) -> float:
-    """Estimate blur severity using Laplacian variance.
+    """Estimate blur severity with the shared Laplacian + FFT analyzer.
 
-    High Laplacian variance → sharp image (low blur severity).
-    Low Laplacian variance  → blurred image (high blur severity).
-
-    Args:
-        image     : [H, W, 3] or [H, W] uint8 image.
-        threshold : Variance below which blur is considered significant.
-
-    Returns:
-        severity : float ∈ [0, 1].  0 = sharp, 1 = severely blurred.
+    ``threshold`` is kept for API compatibility with older tests/callers.
     """
-    if image.ndim == 3:
-        gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-    else:
-        gray = image.copy()
-    if gray.dtype != np.uint8:
-        gray = (gray * 255).astype(np.uint8)
-
-    lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-    severity = float(np.clip(1.0 - lap_var / threshold, 0.0, 1.0))
-    return severity
+    return BlurAnalyzer().analyze(image)['blur_severity']
 
 
 # ─────────────────────────────────────────────────────────────

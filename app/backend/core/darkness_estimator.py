@@ -41,56 +41,98 @@ import cv2
 from pathlib import Path
 from typing import Union, Tuple, Optional
 
-from core.anfis_core import ANFIS, ANFISTrainer
+try:
+    from core.anfis_core import ANFIS, ANFISTrainer
+except ImportError:
+    from .anfis_core import ANFIS, ANFISTrainer
+
+
+def heuristic_degradation_score(features: np.ndarray) -> float:
+    """Deterministic fallback/routing score from calibrated degradation cues."""
+    f = np.asarray(features, dtype=np.float32).clip(0, 1)
+    low_light = 1.0 - f[0]
+    darkness = (
+        low_light * 0.50 +
+        f[2] * 0.24 +
+        low_light * (1.0 - f[3]) * 0.08 +
+        low_light * (1.0 - f[4]) * 0.06 +
+        low_light * (1.0 - f[5]) * 0.04 +
+        f[6] * 0.04 +
+        low_light * f[9] * 0.04
+    )
+    return float(np.clip(darkness, 0.0, 1.0))
 
 
 # ─────────────────────────────────────────────────────────────
-#  Feature Extraction (Paper 3, Section 2)
+#  Feature Extraction (ANFIS 2.0 - 10D)
 # ─────────────────────────────────────────────────────────────
 
 def extract_illumination_features(image: np.ndarray,
                                   dcp_patch: int = 15) -> np.ndarray:
-    """Extract the 4-dimensional illumination feature vector from an image.
-
-    All features are normalised to [0, 1].
-
-    Args:
-        image     : numpy array, shape [H, W, 3], dtype uint8, RGB.
-        dcp_patch : Patch size for Dark Channel Prior (default 15).
-
-    Returns:
-        features : numpy array, shape [4], dtype float32.
-                   [mean_lum, std_lum, dcp_score, entropy]
+    """Extract a 10-dimensional feature vector for high-fidelity ANFIS conditioning.
+    
+    Features:
+    1. Mean Lum, 2. Std Lum, 3. DCP, 4. Entropy, 5. Local RMS,
+    6. Edge Density, 7. Noise Est, 8. Contrast, 9. Hist Spread, 10. FFT Blur.
     """
-    # ── Convert to float [0, 1] and to YCbCr luminance ──────────────
+    if image.dtype != np.uint8:
+        image = np.clip(image.astype(np.float32) * (255.0 if image.max() <= 1.0 else 1.0), 0, 255).astype(np.uint8)
+
     img_f = image.astype(np.float32) / 255.0
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
 
-    # Luminance channel via Rec.601 luma formula
-    # Y = 0.299R + 0.587G + 0.114B
-    lum = 0.299 * img_f[:, :, 0] + \
-          0.587 * img_f[:, :, 1] + \
-          0.114 * img_f[:, :, 2]   # [H, W]  range [0, 1]
+    # 1. Mean Luminance
+    f1 = float(np.mean(gray))
+    
+    # 2. Std Luminance
+    f2 = float(np.std(gray)) / 0.5
+    
+    # 3. DCP
+    f3 = _dark_channel_prior(img_f, patch_size=dcp_patch)
+    
+    # 4. Entropy
+    f4 = _image_entropy(gray)
+    
+    # 5. Local RMS Contrast (Local Variance)
+    kernel = np.ones((5,5), np.float32)/25.0
+    mu = cv2.filter2D(gray, -1, kernel)
+    mu2 = cv2.filter2D(gray**2, -1, kernel)
+    rms = np.sqrt(np.abs(mu2 - mu**2) + 1e-8)
+    f5 = float(np.mean(rms)) * 2.0
+    
+    # 6. Edge Density (adaptive Canny)
+    gray_u8 = (gray * 255).astype(np.uint8)
+    med_gray = float(np.median(gray_u8))
+    edges = cv2.Canny(gray_u8, int(max(0, 0.66 * med_gray)), int(min(255, 1.33 * med_gray + 1)))
+    f6 = float(np.sum(edges > 0)) / (gray.shape[0] * gray.shape[1])
+    
+    # 7. Noise Estimation (Median residual)
+    med = cv2.medianBlur(gray_u8, 3).astype(np.float32) / 255.0
+    noise = np.abs(gray - med)
+    f7 = float(np.std(noise)) * 10.0
+    
+    # 8. Contrast Score (Michelson)
+    c_min, c_max = gray.min(), gray.max()
+    f8 = (c_max - c_min) / (c_max + c_min + 1e-8)
+    
+    # 9. Histogram Spread (IQR)
+    q75, q25 = np.percentile(gray, [75, 25])
+    f9 = (q75 - q25)
+    
+    # 10. FFT blur score: high means high-frequency loss.
+    gray_zm = gray - float(gray.mean())
+    spectrum = np.fft.fftshift(np.fft.fft2(gray_zm))
+    power = np.abs(spectrum) ** 2
+    h, w = gray.shape
+    cy, cx = h // 2, w // 2
+    yy, xx = np.ogrid[-cy:h-cy, -cx:w-cx]
+    radius = np.sqrt(xx * xx + yy * yy)
+    hf_mask = radius > min(h, w) * 0.22
+    lf_mask = radius <= min(h, w) * 0.22
+    hf_ratio = float(power[hf_mask].mean() / (power[hf_mask].mean() + power[lf_mask].mean() + 1e-8))
+    f10 = 1.0 - np.clip(hf_ratio / 0.38, 0.0, 1.0)
 
-    # Feature 1: Mean luminance (μ_Y)  — Paper 3, Eq. (1)
-    f1_mean_lum = float(np.mean(lum))
-
-    # Feature 2: Std deviation (σ_Y)  — Paper 3, Eq. (2)
-    # Normalise by 0.5 (max theoretical std for uniform dist on [0,1])
-    f2_std_lum = float(np.std(lum)) / 0.5
-
-    # Feature 3: Dark Channel Prior score  — Paper 3, Eq. (3)
-    # DCP = mean of the minimum intensity in each local patch
-    # High DCP value → image is NOT dark (contradicts intuition — we invert)
-    f3_dcp = _dark_channel_prior(img_f, patch_size=dcp_patch)
-
-    # Feature 4: Normalised entropy  — Paper 3, Eq. (4)
-    # H = -Σ p_i log2(p_i), normalised by log2(256)
-    f4_entropy = _image_entropy(lum)
-
-    return np.array([f1_mean_lum,
-                     np.clip(f2_std_lum, 0, 1),
-                     f3_dcp,
-                     f4_entropy], dtype=np.float32)
+    return np.array([f1, f2, f3, f4, f5, f6, f7, f8, f9, f10], dtype=np.float32).clip(0, 1)
 
 
 def _dark_channel_prior(img_f: np.ndarray, patch_size: int = 15) -> float:
@@ -267,8 +309,8 @@ class DarknessEstimator:
         self.device = device
         self.n_mfs  = n_mfs
 
-        # ANFIS: 4 illumination features → 1 scalar DF
-        self.model = ANFIS(n_inputs=4, n_mfs=n_mfs, n_outputs=1).to(device)
+        # ANFIS 2.0: 10 illumination/degradation features → 1 scalar DF
+        self.model = ANFIS(n_inputs=10, n_mfs=2, n_outputs=1).to(device)
         self.trainer = ANFISTrainer(self.model, lr=lr)
 
         # Normalisation stats (set during training)
@@ -303,8 +345,8 @@ class DarknessEstimator:
         X_norm = (X - self._feature_mean) / self._feature_std
 
         # Convert to tensors
-        X_t = torch.from_numpy(X_norm).to(self.device)
-        y_t = torch.from_numpy(y).to(self.device)
+        X_t = torch.from_numpy(X_norm).to(self.device).float()
+        y_t = torch.from_numpy(y).to(self.device).float()
 
         print(f"Training ANFIS ({self.model.get_rule_count()} rules, "
               f"{epochs} epochs)...")
@@ -315,29 +357,26 @@ class DarknessEstimator:
         return history
 
     def train_from_arrays(self,
-                          X: np.ndarray,
-                          y: np.ndarray,
+                          X: Union[np.ndarray, torch.Tensor],
+                          y: Union[np.ndarray, torch.Tensor],
                           epochs: int = 200,
                           verbose: bool = True) -> list:
-        """Train directly from pre-computed feature/target arrays.
+        """Train directly from pre-computed feature/target arrays."""
+        if isinstance(X, np.ndarray):
+            X = torch.from_numpy(X.astype(np.float32))
+        if isinstance(y, np.ndarray):
+            y = torch.from_numpy(y.astype(np.float32))
+            
+        X = X.float().to(self.device)
+        y = y.float().to(self.device)
 
-        Useful for Colab where data is pre-generated and cached.
+        self._feature_mean = X.mean(axis=0).cpu().numpy()
+        self._feature_std  = X.std(axis=0).cpu().numpy() + 1e-8
+        
+        X_norm = (X - torch.from_numpy(self._feature_mean).to(self.device).float()) / \
+                 torch.from_numpy(self._feature_std).to(self.device).float()
 
-        Args:
-            X : [N, 4] feature matrix.
-            y : [N, 1] DF targets.
-
-        Returns:
-            loss_history
-        """
-        self._feature_mean = X.mean(axis=0)
-        self._feature_std  = X.std(axis=0) + 1e-8
-        X_norm = (X - self._feature_mean) / self._feature_std
-
-        X_t = torch.from_numpy(X_norm.astype(np.float32)).to(self.device)
-        y_t = torch.from_numpy(y.astype(np.float32)).to(self.device)
-
-        history = self.trainer.fit(X_t, y_t, epochs=epochs, verbose=verbose)
+        history = self.trainer.fit(X_norm, y, epochs=epochs, verbose=verbose)
         self._trained = True
         return history
 
@@ -362,16 +401,21 @@ class DarknessEstimator:
             )
 
         feats = extract_illumination_features(image)
-        feats_norm = (feats - self._feature_mean) / self._feature_std
-        x_t = torch.from_numpy(feats_norm).unsqueeze(0).to(self.device)
+        feats_norm = np.clip((feats - self._feature_mean) / self._feature_std, -4.0, 4.0)
+        x_t = torch.from_numpy(feats_norm).unsqueeze(0).to(self.device).float()
 
         self.model.eval()
         with torch.no_grad():
             raw = self.model(x_t).item()
 
-        # OPTIMIZATION: Removed sigmoid. Model is trained on [0, 1] targets.
-        # Direct clipping ensures linear mapping and 90%+ regression accuracy.
-        return float(np.clip(raw, 0.0, 1.0))
+        model_df = float(np.clip(raw, 0.0, 1.0))
+        heuristic_df = heuristic_degradation_score(feats)
+
+        # The ANFIS checkpoint can be absent, stale, or calibrated on a tiny
+        # synthetic session. Blend in the monotonic feature score to keep
+        # routing stable and prevent near-random class separation.
+        heuristic_weight = 0.28 if abs(model_df - heuristic_df) <= 0.45 else 0.65
+        return float(np.clip((1.0 - heuristic_weight) * model_df + heuristic_weight * heuristic_df, 0.0, 1.0))
 
     def estimate_batch(self, images: list) -> list:
         """Estimate DF for a list of numpy images.
@@ -419,12 +463,12 @@ class DarknessEstimator:
     # ── Interpretability ──────────────────────────────────────────────
 
     def get_feature_names(self) -> list:
-        """Return names of the 4 input features (for reports/plots)."""
+        """Return names of the 10 input features (for reports/plots)."""
         return [
-            'Mean Luminance (μ_Y)',
-            'Luminance Std Dev (σ_Y)',
-            'Dark Channel Prior Score',
-            'Normalised Entropy (H)',
+            'Mean Luminance', 'Std Dev Luminance', 'Dark Channel Prior',
+            'Image Entropy', 'Local RMS Contrast', 'Edge Density',
+            'Noise Estimation', 'Michelson Contrast', 'Histogram Spread',
+            'FFT Blur'
         ]
 
     def describe_prediction(self, image: np.ndarray) -> dict:

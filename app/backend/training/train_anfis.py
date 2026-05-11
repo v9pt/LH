@@ -60,12 +60,18 @@ else:
     N   = TRAIN_N
     gammas  = rng.uniform(1.0, 5.0, N).astype(np.float32)
     targets = ((gammas - 1.0) / 4.0).reshape(-1, 1)
-    X = np.column_stack([
-        np.clip(1.0 - gammas/5 + rng.normal(0, 0.05, N), 0, 1),
-        np.clip(0.3 - gammas/20 + rng.normal(0, 0.02, N), 0, 1),
-        np.clip(gammas/5       + rng.normal(0, 0.05, N), 0, 1),
-        np.clip(1.0 - gammas/8 + rng.normal(0, 0.05, N), 0, 1),
-    ]).astype(np.float32)
+    X = np.stack([
+        np.clip(1.0 - gammas/5 + rng.normal(0, 0.05, N), 0, 1),      # mean lum
+        np.clip(0.3 - gammas/20 + rng.normal(0, 0.02, N), 0, 1),     # std lum
+        np.clip(gammas/5 + rng.normal(0, 0.05, N), 0, 1),           # DCP
+        np.clip(1.0 - gammas/8 + rng.normal(0, 0.05, N), 0, 1),     # entropy
+        np.clip(0.4 - gammas/10 + rng.normal(0, 0.05, N), 0, 1),     # local RMS
+        np.clip(0.2 - gammas/20 + rng.normal(0, 0.05, N), 0, 1),     # edge density
+        np.clip(gammas/10 + rng.normal(0, 0.05, N), 0, 1),          # noise est
+        np.clip(gammas/6 + rng.normal(0, 0.05, N), 0, 1),           # contrast
+        np.clip(0.5 - gammas/15 + rng.normal(0, 0.05, N), 0, 1),     # hist spread
+        np.clip(0.5 - gammas/20 + rng.normal(0, 0.05, N), 0, 1),     # saturation
+    ], axis=1).astype(np.float32)
     history = de.train_from_arrays(X, targets, epochs=ANFIS_EPOCHS, verbose=True)
 
 de.save(CKPT_DIR / 'darkness_estimator.pt')

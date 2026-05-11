@@ -166,7 +166,8 @@ def fine_tune_rrdb():
             
             # 2. LCR + Reg
             lr_float = lr_img.astype(np.float32) / 255.0
-            lcr_out = lcr.hallucinate(lr_float, df) if face_dict.D is not None else cv2.resize(lr_float, (128, 128))
+            lcr_ready = face_dict._built and face_dict.D_LR is not None and face_dict.D_HR is not None
+            lcr_out = lcr.hallucinate(lr_float, df) if lcr_ready else cv2.resize(lr_float, (128, 128))
             reg_out = regressor.reconstruct(lr_img) if regressor._trained else cv2.resize(lr_float, (128, 128))
             
             reg_out = cv2.resize(reg_out, (128, 128))

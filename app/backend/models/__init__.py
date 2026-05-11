@@ -3,7 +3,7 @@
 from .zero_dce import DCE_Net, ZeroDCE
 from .rrdb_generator import RRDBGenerator, RRDBNet
 from .discriminator import PatchGANDiscriminator
-from .arcface_model import ArcFaceModel, SimplifiedArcFace
+from .arcface_model import ArcFaceModel, DifferentiableArcFace
 from .landmark_detector import LandmarkDetector, SimplifiedLandmarkDetector
 
 __all__ = [
@@ -13,7 +13,7 @@ __all__ = [
     'RRDBNet',
     'PatchGANDiscriminator',
     'ArcFaceModel',
-    'SimplifiedArcFace',
+    'DifferentiableArcFace',
     'LandmarkDetector',
     'SimplifiedLandmarkDetector',
 ]

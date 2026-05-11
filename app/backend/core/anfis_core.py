@@ -77,9 +77,10 @@ class GaussianMF(nn.Module):
         # self.c: [n_inputs, n_rules]  →  [1, n_inputs, n_rules]
         x_expand = x.unsqueeze(2)                         # [B, I, 1]
         c_expand = self.c.unsqueeze(0)                    # [1, I, K]
-        s_expand = self.sigma.abs().unsqueeze(0) + 1e-8   # [1, I, K]  prevent div/0
+        s_expand = self.sigma.abs().clamp(min=0.08, max=3.0).unsqueeze(0) + 1e-8
 
-        mu = torch.exp(-((x_expand - c_expand) ** 2) / (2 * s_expand ** 2))
+        exponent = -((x_expand - c_expand) ** 2) / (2 * s_expand ** 2)
+        mu = torch.exp(exponent.clamp(min=-30.0, max=0.0))
         return mu   # [B, I, K]
 
 
@@ -87,7 +88,7 @@ class GaussianMF(nn.Module):
 #  Layer 2: Rule Strength — Product of MFs
 # ─────────────────────────────────────────────────────────────
 
-def compute_rule_strengths(mu: torch.Tensor) -> torch.Tensor:
+def compute_rule_strengths(mu: torch.Tensor, rule_indices: Optional[torch.Tensor] = None) -> torch.Tensor:
     """Compute firing strength for each rule via product T-norm.
 
     For a grid of n_rules per input, the total rules = n_rules^n_inputs.
@@ -105,7 +106,12 @@ def compute_rule_strengths(mu: torch.Tensor) -> torch.Tensor:
 
     # Build all rule index combinations  (Cartesian product)
     # indices: [total_rules, n_inputs]
-    idx = torch.cartesian_prod(*[torch.arange(n_rules)] * n_inputs)  # [R, I]
+    if rule_indices is None:
+        idx = torch.cartesian_prod(
+            *[torch.arange(n_rules, device=mu.device)] * n_inputs
+        )  # [R, I]
+    else:
+        idx = rule_indices.to(mu.device)
 
     # Gather membership values per rule
     # mu[:, i, r_i] for each rule r
@@ -131,7 +137,8 @@ def normalize_strengths(w: torch.Tensor) -> torch.Tensor:
     Returns:
         w_bar : [batch, total_rules]  sum-to-1 per sample.
     """
-    return w / (w.sum(dim=1, keepdim=True) + 1e-8)
+    denom = w.sum(dim=1, keepdim=True).clamp_min(1e-8)
+    return w / denom
 
 
 # ─────────────────────────────────────────────────────────────
@@ -211,6 +218,11 @@ class ANFIS(nn.Module):
 
         # Layer 1: Gaussian membership functions
         self.mf_layer = GaussianMF(n_inputs, n_mfs)
+        self.register_buffer(
+            'rule_indices',
+            torch.cartesian_prod(*[torch.arange(n_mfs)] * n_inputs).long(),
+            persistent=False,
+        )
 
         # Layer 4: Consequent parameters
         self.consequent = ConsequentLayer(n_inputs, self.n_rules, n_outputs)
@@ -228,7 +240,7 @@ class ANFIS(nn.Module):
         mu = self.mf_layer(x)                  # [B, I, K]
 
         # Layer 2 — Rule strength: w_r = Π_i μ_{i, r_i}
-        w = compute_rule_strengths(mu)          # [B, R]
+        w = compute_rule_strengths(mu, self.rule_indices)          # [B, R]
 
         # Layer 3 — Normalisation: w_bar_r = w_r / Σ w
         w_bar = normalize_strengths(w)          # [B, R]
@@ -251,7 +263,7 @@ class ANFIS(nn.Module):
         """
         return {
             'centers': self.mf_layer.c.detach().cpu().numpy(),
-            'sigmas' : self.mf_layer.sigma.abs().detach().cpu().numpy(),
+            'sigmas' : self.mf_layer.sigma.detach().cpu().numpy(),
         }
 
     def get_rule_count(self) -> int:
@@ -282,9 +294,12 @@ class ANFISTrainer:
         self.model = model
         self.lr    = lr
 
-        # Only premise params (MF centres + sigmas) via gradient descent
-        premise_params = list(model.mf_layer.parameters())
-        self.optimizer = torch.optim.Adam(premise_params, lr=lr)
+        # Full LSE is excellent for small rule bases, but a 10-D ANFIS with
+        # 2 MFs has 1024 rules and an 11264-column LSE system. In that case,
+        # training all parameters with Adam is faster and more stable.
+        self.use_lse = model.n_rules * (model.n_inputs + 1) <= 4096
+        opt_params = list(model.mf_layer.parameters()) if self.use_lse else list(model.parameters())
+        self.optimizer = torch.optim.Adam(opt_params, lr=lr, weight_decay=1e-5)
         self.criterion = nn.MSELoss()
 
         # Consequent params via full LSE each epoch
@@ -307,7 +322,7 @@ class ANFISTrainer:
         with torch.no_grad():
             # Forward through layers 1–3 to get w_bar
             mu    = self.model.mf_layer(x)
-            w     = compute_rule_strengths(mu)
+            w     = compute_rule_strengths(mu, self.model.rule_indices)
             w_bar = normalize_strengths(w)            # [N, R]
 
             # Build regressor matrix Φ: [N, R*(n_inputs+1)]
@@ -347,13 +362,15 @@ class ANFISTrainer:
             loss : Scalar MSE loss value.
         """
         # ── Forward: update consequents via LSE ─────────────────────
-        self._update_consequents_lse(x, y_target)
+        if self.use_lse:
+            self._update_consequents_lse(x, y_target)
 
         # ── Backward: update premise params via gradient descent ─────
         self.optimizer.zero_grad()
         y_pred = self.model(x)
         loss   = self.criterion(y_pred, y_target)
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.optimizer.param_groups[0]['params'], max_norm=1.0)
         self.optimizer.step()
 
         return loss.item()

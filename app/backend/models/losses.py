@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import lpips
+from pytorch_msssim import ssim as ms_ssim
 
 class CharbonnierLoss(nn.Module):
     """
@@ -59,13 +60,15 @@ class EdgeLoss(nn.Module):
     def forward(self, pred, target):
         pred_gray = pred.mean(dim=1, keepdim=True)
         target_gray = target.mean(dim=1, keepdim=True)
+        k_x = self.k_x.to(device=pred.device, dtype=pred.dtype)
+        k_y = self.k_y.to(device=pred.device, dtype=pred.dtype)
         
-        pred_gx = F.conv2d(pred_gray, self.k_x, padding=1)
-        pred_gy = F.conv2d(pred_gray, self.k_y, padding=1)
+        pred_gx = F.conv2d(pred_gray, k_x, padding=1)
+        pred_gy = F.conv2d(pred_gray, k_y, padding=1)
         pred_edge = torch.sqrt(pred_gx**2 + pred_gy**2 + 1e-6)
         
-        target_gx = F.conv2d(target_gray, self.k_x, padding=1)
-        target_gy = F.conv2d(target_gray, self.k_y, padding=1)
+        target_gx = F.conv2d(target_gray, k_x, padding=1)
+        target_gy = F.conv2d(target_gray, k_y, padding=1)
         target_edge = torch.sqrt(target_gx**2 + target_gy**2 + 1e-6)
         
         return F.l1_loss(pred_edge, target_edge)
@@ -85,25 +88,22 @@ class HybridLossCombiner(nn.Module):
         self.perceptual_loss = lpips.LPIPS(net='vgg').to(device)
         self.perceptual_loss.eval()
         
-        # Frequency Loss
         self.freq_loss = FocalFrequencyLoss()
-        
-        # NEW: Edge Loss for structural integrity (SSIM boost)
         self.edge_loss = EdgeLoss()
         
-        # Weights (as defined in the implementation plan)
+        # Identity-first objective: L = λ1 L1 + λ2 LPIPS + λ3 ArcFace + λ4 SSIM.
         self.w_l1 = 1.0
-        self.w_percep = 1.0
-        self.w_id = 0.8
-        self.w_freq = 0.1
-        self.w_edge = 0.5
-        self.w_adv = 0.1 # Adversarial loss handles separately by a discriminator
+        self.w_percep = 0.35
+        self.w_id = 4.0
+        self.w_ssim = 0.8
+        self.w_freq = 0.05
+        self.w_edge = 0.20
 
     def forward(self, pred, target, arcface_model=None):
         """
         pred: SR image [B, 3, H, W], range [0, 1]
         target: HR image [B, 3, H, W], range [0, 1]
-        arcface_model: instance of ArcFaceModel for Identity Loss
+        arcface_model: instance of DifferentiableArcFace for Identity Loss
         """
         loss_dict = {}
         
@@ -112,38 +112,32 @@ class HybridLossCombiner(nn.Module):
         loss_dict['l1'] = l1 * self.w_l1
         
         # 2. Perceptual Loss (VGG)
-        # lpips expects inputs in [-1, 1]
         pred_norm = pred * 2 - 1
         target_norm = target * 2 - 1
         percep = self.perceptual_loss(pred_norm, target_norm).mean()
         loss_dict['percep'] = percep * self.w_percep
+
+        ssim_loss = 1.0 - ms_ssim(pred.clamp(0, 1), target.clamp(0, 1), data_range=1.0, size_average=True)
+        loss_dict['ssim'] = ssim_loss * self.w_ssim
         
         # 3. Frequency Loss
         freq = self.freq_loss(pred, target)
         loss_dict['freq'] = freq * self.w_freq
         
-        # NEW: 4. Edge Loss
+        # 4. Edge Loss
         edge = self.edge_loss(pred, target)
         loss_dict['edge'] = edge * self.w_edge
         
-        # 5. Identity Loss
+        # 5. Identity Loss (Differentiable)
         if arcface_model is not None:
-            # pred and target are [B, 3, H, W]
-            pred_embs = arcface_model.extract_embeddings_batch(pred)
-            target_embs = arcface_model.extract_embeddings_batch(target)
+            # Extract embeddings directly from tensors (preserves gradients)
+            pred_emb = arcface_model(pred)
+            target_emb = arcface_model(target)
             
-            valid_sims = []
-            for p_emb, t_emb in zip(pred_embs, target_embs):
-                if p_emb is not None and t_emb is not None:
-                    valid_sims.append(arcface_model.cosine_similarity(p_emb, t_emb))
-            
-            if valid_sims:
-                avg_sim = sum(valid_sims) / len(valid_sims)
-                # Convert to tensor and invert for loss
-                id_loss = 1.0 - torch.tensor(avg_sim, device=self.device)
-                loss_dict['id'] = id_loss * self.w_id
-            else:
-                loss_dict['id'] = torch.tensor(0.0, device=self.device)
+            # Identity Loss = 1 - Cosine Similarity
+            # Higher similarity -> Lower loss
+            id_loss = 1.0 - F.cosine_similarity(pred_emb, target_emb).mean()
+            loss_dict['id'] = id_loss * self.w_id
         else:
             loss_dict['id'] = torch.tensor(0.0, device=self.device)
             

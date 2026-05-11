@@ -4,6 +4,7 @@ Uses pretrained InsightFace models for face recognition.
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from insightface.app import FaceAnalysis
 import cv2
@@ -90,46 +91,82 @@ class ArcFaceModel:
         ).item()
 
 
-class SimplifiedArcFace(nn.Module):
-    """Simplified ArcFace model for training pipeline.
-    
-    This is a lightweight version for computing identity loss during training.
-    """
-    
-    def __init__(self, embedding_size=512):
-        super(SimplifiedArcFace, self).__init__()
-        self.embedding_size = embedding_size
-        
-        # Simple CNN for feature extraction (placeholder)
-        # In practice, load pretrained ArcFace backbone
-        self.features = nn.Sequential(
-            nn.Conv2d(3, 64, 3, 2, 1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 128, 3, 2, 1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(128, 256, 3, 2, 1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool2d(1)
-        )
-        self.fc = nn.Linear(256, embedding_size)
-    
+class IResNetBlock(nn.Module):
+    def __init__(self, in_planes, planes, stride=1):
+        super(IResNetBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_planes, planes, 3, 1, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.relu = nn.PReLU(planes)
+        self.conv2 = nn.Conv2d(planes, planes, 3, stride, 1, bias=False)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.downsample = None
+        if stride != 1 or in_planes != planes:
+            self.downsample = nn.Sequential(
+                nn.Conv2d(in_planes, planes, 1, stride, bias=False),
+                nn.BatchNorm2d(planes)
+            )
+
     def forward(self, x):
-        """Extract embeddings.
+        identity = x
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        out = self.bn2(out)
+        if self.downsample is not None:
+            identity = self.downsample(x)
+        out += identity
+        return out
+
+class DifferentiableArcFace(nn.Module):
+    """
+    Differentiable ArcFace (IResNet50) for Identity-Preserving Training.
+    Allows the restoration model to receive gradients from the identity space.
+    """
+    def __init__(self, device='cpu'):
+        super(DifferentiableArcFace, self).__init__()
+        self.device = device
+        # Simplified IResNet-50 structure for training efficiency
+        self.in_planes = 64
+        self.conv1 = nn.Conv2d(3, 64, 3, 1, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.prelu = nn.PReLU(64)
+        self.layer1 = self._make_layer(64, 3)
+        self.layer2 = self._make_layer(128, 4, stride=2)
+        self.layer3 = self._make_layer(256, 6, stride=2)
+        self.layer4 = self._make_layer(512, 3, stride=2)
+        self.bn2 = nn.BatchNorm2d(512)
+        self.pool = nn.AdaptiveAvgPool2d((7, 7))
+        self.fc = nn.Linear(512 * 7 * 7, 512)
+        self.bn3 = nn.BatchNorm1d(512)
         
-        Args:
-            x: Input images [B, 3, H, W]
-            
-        Returns:
-            Embeddings [B, 512]
-        """
-        feat = self.features(x)
-        feat = feat.view(feat.size(0), -1)
-        emb = self.fc(feat)
-        # L2 normalize
-        emb = nn.functional.normalize(emb, p=2, dim=1)
-        return emb
+        self.to(device)
+        self.eval()
 
+    def _make_layer(self, planes, blocks, stride=1):
+        layers = []
+        layers.append(IResNetBlock(self.in_planes, planes, stride))
+        self.in_planes = planes
+        for _ in range(1, blocks):
+            layers.append(IResNetBlock(self.in_planes, planes))
+        return nn.Sequential(*layers)
 
+    def forward(self, x):
+        # Input expected in range [0, 1] and size [112, 112]
+        if x.shape[2] != 112 or x.shape[3] != 112:
+            x = F.interpolate(x, size=(112, 112), mode='bilinear', align_corners=True)
+        
+        x = (x - 0.5) / 0.5 # Normalise to [-1, 1]
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.prelu(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.bn2(x)
+        x = self.pool(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
+        x = self.bn3(x)
+        return F.normalize(x, p=2, dim=1)

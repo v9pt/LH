@@ -1,207 +1,57 @@
-"""Dataset classes for face super-resolution."""
+from pathlib import Path
 
-import torch
-from torch.utils.data import Dataset, DataLoader
-import os
 import cv2
 import numpy as np
-from pathlib import Path
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-from PIL import Image
+import torch
+from torch.utils.data import Dataset
+
+try:
+    from app.backend.core.darkness_estimator import extract_illumination_features
+except ImportError:
+    from core.darkness_estimator import extract_illumination_features
 
 
 class FaceSRDataset(Dataset):
-    """Face Super-Resolution dataset.
-    
-    Loads high-resolution face images and creates LR counterparts.
-    """
-    
-    def __init__(self, image_dir, image_degrader, hr_size=128, 
-                 augment=True, max_images=None):
-        """Initialize dataset.
-        
-        Args:
-            image_dir: Directory or list of directories containing HR face images
-            image_degrader: ImageDegrader instance
-            hr_size: Size of HR images (will be resized)
-            augment: Whether to apply data augmentation
-            max_images: Maximum number of images to load (None for all)
-        """
-        if isinstance(image_dir, (list, tuple)):
-            self.image_dirs = [Path(d) for d in image_dir]
-        else:
-            self.image_dirs = [Path(image_dir)]
-        
-        self.degrader = image_degrader
+    """Image folder dataset returning LR/HR tensors and 10-D ANFIS condition."""
+
+    def __init__(self, data_dirs, degrader, hr_size=128, augment=True, max_images=None):
+        self.degrader = degrader
         self.hr_size = hr_size
-        
-        # Get image paths
-        self.image_paths = self._get_image_paths(max_images)
-        
-        # Augmentation pipeline
-        if augment:
-            self.transform = A.Compose([
-                A.HorizontalFlip(p=0.5),
-                A.Rotate(limit=10, p=0.3),
-                A.RandomBrightnessContrast(p=0.3),
-            ])
-        else:
-            self.transform = None
-    
-    def _get_image_paths(self, max_images=None):
-        """Get list of image paths from all directories."""
-        extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
+        self.augment = augment
         paths = []
-        
-        for ext in extensions:
-            for d in self.image_dirs:
-                if d.exists():
-                    paths.extend(d.glob(f'*{ext}'))
-                    paths.extend(d.glob(f'*{ext.upper()}'))
-        
-        paths = sorted(paths)
-        
-        if max_images:
+        for data_dir in data_dirs:
+            root = Path(data_dir)
+            if root.exists():
+                paths.extend(sorted(root.glob("*.jpg")))
+                paths.extend(sorted(root.glob("*.jpeg")))
+                paths.extend(sorted(root.glob("*.png")))
+        if max_images is not None:
             paths = paths[:max_images]
-        
-        return paths
-    
+        self.paths = paths
+
     def __len__(self):
-        return len(self.image_paths)
-    
-    def __getitem__(self, idx):
-        """Get item.
-        
-        Returns:
-            Dictionary with 'lr' and 'hr' images as tensors [3, H, W]
-        """
-        # Load HR image
-        img_path = self.image_paths[idx]
-        hr_image = cv2.imread(str(img_path))
-        hr_image = cv2.cvtColor(hr_image, cv2.COLOR_BGR2RGB)
-        
-        # Resize to target HR size
-        hr_image = cv2.resize(hr_image, (self.hr_size, self.hr_size),
-                             interpolation=cv2.INTER_LANCZOS4)
-        
-        # Apply augmentation
-        if self.transform:
-            augmented = self.transform(image=hr_image)
-            hr_image = augmented['image']
-        
-        # Convert to tensor [0, 1]
-        hr_tensor = torch.from_numpy(hr_image).float() / 255.0
-        hr_tensor = hr_tensor.permute(2, 0, 1)  # [3, H, W]
-        
-        # Create LR image
-        lr_tensor = self.degrader.degrade(hr_tensor)
-        
-        return {
-            'lr': lr_tensor,
-            'hr': hr_tensor,
-            'path': str(img_path)
-        }
+        return len(self.paths)
+
+    def __getitem__(self, index):
+        path = self.paths[index]
+        bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        if bgr is None:
+            raise RuntimeError(f"Could not read image: {path}")
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        rgb = cv2.resize(rgb, (self.hr_size, self.hr_size), interpolation=cv2.INTER_AREA)
+
+        rng = np.random.default_rng(index + 17)
+        if self.augment and rng.random() < 0.5:
+            rgb = np.ascontiguousarray(rgb[:, ::-1, :])
+
+        lr = self.degrader(rgb, rng=rng)
+        condition = extract_illumination_features((lr * 255.0).astype(np.uint8))
+
+        hr_t = torch.from_numpy(rgb.astype(np.float32) / 255.0).permute(2, 0, 1)
+        lr_t = torch.from_numpy(lr).permute(2, 0, 1)
+        cond_t = torch.from_numpy(condition.astype(np.float32))
+
+        return {"lr": lr_t.float(), "hr": hr_t.float(), "condition": cond_t.float()}
 
 
-class UnpairedDarkDataset(Dataset):
-    """Unpaired dark images for Zero-DCE pretraining.
-    
-    Only loads dark images, no paired HR needed.
-    """
-    
-    def __init__(self, image_dir, image_size=128, max_images=None):
-        """Initialize dataset.
-        
-        Args:
-            image_dir: Directory containing face images
-            image_size: Size to resize images
-            max_images: Maximum number of images
-        """
-        self.image_dir = Path(image_dir)
-        self.image_size = image_size
-        self.image_paths = self._get_image_paths(max_images)
-    
-    def _get_image_paths(self, max_images=None):
-        extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
-        paths = []
-        for ext in extensions:
-            paths.extend(self.image_dir.glob(f'*{ext}'))
-        paths = sorted(paths)
-        if max_images:
-            paths = paths[:max_images]
-        return paths
-    
-    def __len__(self):
-        return len(self.image_paths)
-    
-    def __getitem__(self, idx):
-        # Load image
-        img_path = self.image_paths[idx]
-        image = cv2.imread(str(img_path))
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        
-        # Resize
-        image = cv2.resize(image, (self.image_size, self.image_size))
-        
-        # Convert to tensor
-        tensor = torch.from_numpy(image).float() / 255.0
-        tensor = tensor.permute(2, 0, 1)
-        
-        # Apply random darkening
-        gamma = np.random.uniform(2.5, 5.0)
-        tensor = torch.pow(tensor, gamma)
-        
-        return {
-            'dark': tensor,
-            'path': str(img_path)
-        }
-
-
-def create_dataloaders(train_dir, val_dir, image_degrader,
-                      batch_size=16, num_workers=4, hr_size=128,
-                      max_train=None, max_val=None):
-    """Create train and validation dataloaders.
-    
-    Args:
-        train_dir: Training images directory
-        val_dir: Validation images directory
-        image_degrader: ImageDegrader instance
-        batch_size: Batch size
-        num_workers: Number of dataloader workers
-        hr_size: HR image size
-        max_train: Max training images
-        max_val: Max validation images
-        
-    Returns:
-        Tuple of (train_loader, val_loader)
-    """
-    train_dataset = FaceSRDataset(
-        train_dir, image_degrader, hr_size=hr_size,
-        augment=True, max_images=max_train
-    )
-    
-    val_dataset = FaceSRDataset(
-        val_dir, image_degrader, hr_size=hr_size,
-        augment=False, max_images=max_val
-    )
-    
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=True
-    )
-    
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=True
-    )
-    
-    return train_loader, val_loader
-
-
+FaceDataset = FaceSRDataset

@@ -156,7 +156,8 @@ def lcr_encode(patch: np.ndarray,
 
 def anfis_reweight_coefficients(alpha: np.ndarray,
                                  atom_darknesses: np.ndarray,
-                                 darkness_factor: float) -> np.ndarray:
+                                 darkness_factor: float,
+                                 strength: float = 0.35) -> np.ndarray:
     """Re-weight LCR coefficients based on image darkness (ANFIS guidance).
 
     Paper 1 Section III-C: "ANFIS-guided LCR weighting":
@@ -179,9 +180,15 @@ def anfis_reweight_coefficients(alpha: np.ndarray,
     affinity = np.clip(affinity, 0, 1)
 
     # Multiply element-wise and renormalise
-    alpha_rw = alpha * affinity
+    strength = float(np.clip(strength, 0.0, 0.6))
+    alpha_rw = alpha * ((1.0 - strength) + strength * affinity)
     norm = np.abs(alpha_rw).sum() + 1e-8
-    return (alpha_rw / norm).astype(np.float32)
+    alpha_rw = alpha_rw / norm
+
+    # Avoid hard codebook snapping by keeping the largest atom from dominating.
+    alpha_rw = np.clip(alpha_rw, -0.35, 0.35)
+    alpha_rw = alpha_rw / (np.abs(alpha_rw).sum() + 1e-8)
+    return alpha_rw.astype(np.float32)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -416,7 +423,11 @@ class ANFISLocalityRepresentation:
 
             # ANFIS reweight by darkness factor
             alpha_rw = anfis_reweight_coefficients(
-                alpha, self.dict.atom_darknesses, darkness_factor)
+                alpha,
+                self.dict.atom_darknesses,
+                darkness_factor,
+                strength=0.15 + 0.30 * float(np.clip(darkness_factor, 0.0, 1.0)),
+            )
 
             # HR patch estimate: D_HR · α
             hr_patch_vec = self.dict.D_HR @ alpha_rw   # [d_hr]
@@ -435,7 +446,9 @@ class ANFISLocalityRepresentation:
             hr_output_shape,
             patch_size=self.dict.hr_patch)
 
-        return hr_image   # float32 in [0, 1]
+        base = cv2.resize(lr_f, (W_hr, H_hr), interpolation=cv2.INTER_LANCZOS4)
+        blend = float(np.clip(0.25 + 0.35 * darkness_factor, 0.25, 0.60))
+        return np.clip(blend * hr_image + (1.0 - blend) * base, 0.0, 1.0).astype(np.float32)
 
 
 # ─────────────────────────────────────────────────────────────

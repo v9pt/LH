@@ -8,9 +8,8 @@ class SpatialFeatureTransform(nn.Module):
     Acts as the 'Fuzzy Router' in the architecture.
     Takes the fuzzy condition vector from ANFIS and modulates the SwinIR features.
     """
-    def __init__(self, feature_dim, condition_dim=2):
+    def __init__(self, feature_dim, condition_dim=10): # Updated to 10-D ANFIS
         super(SpatialFeatureTransform, self).__init__()
-        # We map the low-dim condition (e.g. [darkness, blur]) to the feature channels
         self.mlp_scale = nn.Sequential(
             nn.Linear(condition_dim, 64),
             nn.ReLU(inplace=True),
@@ -21,15 +20,26 @@ class SpatialFeatureTransform(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(64, feature_dim)
         )
+        self.residual_gate = nn.Sequential(
+            nn.Linear(condition_dim, feature_dim),
+            nn.Sigmoid()
+        )
 
     def forward(self, x, condition):
         # x: [B, C, H, W]
         # condition: [B, condition_dim]
-        scale = self.mlp_scale(condition).unsqueeze(-1).unsqueeze(-1) # [B, C, 1, 1]
-        shift = self.mlp_shift(condition).unsqueeze(-1).unsqueeze(-1) # [B, C, 1, 1]
         
-        # FiLM: Feature-wise Linear Modulation
-        out = x * (1 + scale) + shift
+        # Explicit float hardening
+        condition = condition.float()
+        
+        # Conservative bounded FiLM. The previous +/-50% scaling was strong
+        # enough to move identity embeddings before reconstruction.
+        scale = torch.tanh(self.mlp_scale(condition)).unsqueeze(-1).unsqueeze(-1) * 0.15
+        shift = torch.tanh(self.mlp_shift(condition)).unsqueeze(-1).unsqueeze(-1) * 0.05
+        gate = self.residual_gate(condition).unsqueeze(-1).unsqueeze(-1) * 0.35
+
+        modulated = x * (1.0 + scale) + shift
+        out = x + gate * (modulated - x)
         
         # Return the feature map and the scale map (which serves as the Fuzzy Attention Heatmap)
         return out, scale
@@ -122,7 +132,8 @@ class SwinFuzzyLCR(nn.Module):
         self.feat_extract = nn.Conv2d(in_channels, feature_dim, kernel_size=3, padding=1)
         
         # 2. Spatial Feature Transform (Fuzzy Modulation)
-        self.sft = SpatialFeatureTransform(feature_dim, condition_dim=2)
+        # Synchronized with 10-D ANFIS feature vector
+        self.sft = SpatialFeatureTransform(feature_dim, condition_dim=10)
         
         # 3. SwinIR Backbone (Simplified for demonstration, would typically import from models)
         # In a full implementation, this uses shifted-window attention blocks.
@@ -145,6 +156,7 @@ class SwinFuzzyLCR(nn.Module):
             nn.LeakyReLU(0.2, True),
             nn.Conv2d(128, 256, kernel_size=1)
         )
+        self.identity_projection = nn.Conv2d(feature_dim, 256, kernel_size=1)
         
         # 5. Output Reconstruction & Upsampling (4x)
         self.reconstruction = nn.Sequential(
@@ -157,8 +169,12 @@ class SwinFuzzyLCR(nn.Module):
     def forward(self, x, anfis_condition):
         """
         x: [B, 3, H, W] Low-light degraded image
-        anfis_condition: [B, 2] Fuzzy degradation scores (e.g., [darkness_factor, blur_severity])
+        anfis_condition: [B, 10] Fuzzy degradation scores
         """
+        # Explicit float hardening
+        x = x.to(torch.float32)
+        anfis_condition = anfis_condition.to(torch.float32)
+        
         # Extract base features
         feat = self.feat_extract(x)
         
@@ -176,10 +192,27 @@ class SwinFuzzyLCR(nn.Module):
         deep_feat = self.wavelet_fusion(deep_feat)
         
         # Project to Locality Constrained Representation (VQ-Codebook Latent Space)
-        lcr_latent = self.lcr_projection(deep_feat)
+        projected_latent = self.lcr_projection(deep_feat)
+        identity_latent = self.identity_projection(deep_feat)
+        
+        # Adaptive Residual Gating: 
+        # Clean images (low darkness/blur) rely more on input structure
+        # High degradation images rely more on deep processing
+        darkness = anfis_condition[:, 0:1]
+        blur = anfis_condition[:, 9:10] if anfis_condition.shape[1] > 9 else anfis_condition.mean(dim=1, keepdim=True)
+        degradation = torch.clamp(0.65 * darkness + 0.35 * blur, 0.0, 1.0)
+        latent_weight = torch.clamp(0.12 + 0.38 * degradation, 0.12, 0.50).unsqueeze(-1).unsqueeze(-1)
+        lcr_latent = latent_weight * projected_latent + (1.0 - latent_weight) * identity_latent
+
+        gate = torch.clamp(0.18 + 0.42 * degradation, 0.18, 0.60).unsqueeze(-1).unsqueeze(-1)
         
         # Reconstruct high-resolution image
-        out = self.reconstruction(lcr_latent)
+        out_deep = self.reconstruction(lcr_latent)
+        
+        # Identity Preservation: Blend deep reconstruction with bicubic/input
+        # This ensures that even if LCR fails, the identity structure remains.
+        out_base = F.interpolate(x, size=out_deep.shape[2:], mode='bilinear', align_corners=True)
+        out = gate * out_deep + (1.0 - gate) * out_base
+        out = torch.clamp(out, 0.0, 1.0)
         
         return out, lcr_latent, fuzzy_heatmap
-

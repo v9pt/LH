@@ -141,12 +141,18 @@ class TestDarknessEstimator:
         N   = 300
         g   = rng.uniform(1.0, 5.0, N).astype(np.float32)
         t   = ((g - 1.0) / 4.0).reshape(-1, 1)
-        X   = np.column_stack([
-            np.clip(1 - g/5 + rng.normal(0, .05, N), 0, 1),
-            np.clip(.3 - g/20, 0, 1),
-            np.clip(g/5, 0, 1),
-            np.clip(1 - g/8, 0, 1),
-        ]).astype(np.float32)
+        X = np.stack([
+            np.clip(1.0 - g/5 + rng.normal(0, 0.05, N), 0, 1),
+            np.clip(0.3 - g/20 + rng.normal(0, 0.02, N), 0, 1),
+            np.clip(g/5 + rng.normal(0, 0.05, N), 0, 1),
+            np.clip(1.0 - g/8 + rng.normal(0, 0.05, N), 0, 1),
+            np.clip(0.4 - g/10 + rng.normal(0, 0.05, N), 0, 1),
+            np.clip(0.2 - g/20 + rng.normal(0, 0.05, N), 0, 1),
+            np.clip(g/10 + rng.normal(0, 0.05, N), 0, 1),
+            np.clip(g/6 + rng.normal(0, 0.05, N), 0, 1),
+            np.clip(0.5 - g/15 + rng.normal(0, 0.05, N), 0, 1),
+            np.clip(0.5 - g/20 + rng.normal(0, 0.05, N), 0, 1),
+        ], axis=1).astype(np.float32)
 
         de = DarknessEstimator(n_mfs=2)
         de.train_from_arrays(X, t, epochs=50, verbose=False)
@@ -159,13 +165,18 @@ class TestDarknessEstimator:
             np.array([[0.5, 0.2, 0.5, 0.6]], dtype=np.float32),   # mid
         ]
         for feats in test_cases:
-            norm_feats = (feats - de._feature_mean) / de._feature_std
-            import torch, math
-            x_t = torch.from_numpy(norm_feats)
+            # Pad with zeros to 10-D for the test cases if needed, but here we just use 10-D samples
+            f10 = np.zeros((1, 10), dtype=np.float32)
+            f10[0, :4] = feats[0]
+            df = de.estimate_batch([np.zeros((128,128,3), dtype=np.uint8)]) # Just dummy
+            
+            # Use the actual estimate logic
+            feats_norm = (f10 - de._feature_mean) / de._feature_std
+            x_t = torch.from_numpy(feats_norm).float()
             de.model.eval()
             with torch.no_grad():
                 raw = de.model(x_t).item()
-            df = float(np.clip(1.0 / (1.0 + math.exp(-raw * 4.0)), 0.0, 1.0))
+            df = float(np.clip(raw, 0.0, 1.0))
             assert 0.0 <= df <= 1.0, f"DF must be in [0,1], got {df}"
 
     def test_save_load(self):
@@ -174,8 +185,13 @@ class TestDarknessEstimator:
         N   = 200
         g   = rng.uniform(1.0, 5.0, N).astype(np.float32)
         t   = ((g - 1.0) / 4.0).reshape(-1, 1)
-        X   = np.column_stack([np.clip(1-g/5, 0, 1), np.clip(.3-g/20, 0, 1),
-                                np.clip(g/5, 0, 1), np.clip(1-g/8, 0, 1)]).astype(np.float32)
+        X = np.stack([
+            np.clip(1.0 - g/5, 0, 1), np.clip(0.3 - g/20, 0, 1),
+            np.clip(g/5, 0, 1), np.clip(1.0 - g/8, 0, 1),
+            np.clip(0.4 - g/10, 0, 1), np.clip(0.2 - g/20, 0, 1),
+            np.clip(g/10, 0, 1), np.clip(g/6, 0, 1),
+            np.clip(0.5 - g/15, 0, 1), np.clip(0.5 - g/20, 0, 1)
+        ], axis=1).astype(np.float32)
 
 
         de = DarknessEstimator(n_mfs=2)
