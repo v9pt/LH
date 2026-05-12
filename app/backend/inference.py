@@ -14,6 +14,7 @@ The ANFIS module mathematically gates the Zero-DCE enhancement, and the
 VQ-Codebook inside GFPGAN acts as the modern Locality Constrained Representation.
 """
 
+import sys, os
 import random
 import torch
 import torch.nn as nn
