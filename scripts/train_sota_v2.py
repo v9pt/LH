@@ -103,7 +103,10 @@ class CelebADataset(Dataset):
         
         return lr_t, hr_t, feats_t
 
-def train_convergence(epochs=200, batch_size=8, subset=5000):
+def train_convergence(epochs=200, batch_size=8, subset=5000, lr=1e-4, save_every=5, 
+                      identity_weight=4.0, ssim_weight=1.0, fft_weight=0.5, 
+                      sobel_weight=0.5, residual_scale=0.05, blend_alpha=0.85, 
+                      disable_fallback=True, save_visuals=False):
     # Mac Optimization: Use MPS if available
     if torch.cuda.is_available():
         device = 'cuda'
@@ -125,7 +128,7 @@ def train_convergence(epochs=200, batch_size=8, subset=5000):
     fft = FFTLoss().to(device)
     vgg = VGGPercLoss().to(device)
     
-    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     
     # 3. Data
@@ -139,54 +142,49 @@ def train_convergence(epochs=200, batch_size=8, subset=5000):
         model.train()
         epoch_loss = 0
         
-        for lr, hr, feats in loader:
-            lr, hr, feats = lr.to(device), hr.to(device), feats.to(device)
+        for lr_img, hr_img, feats in loader:
+            lr_img, hr_img, feats = lr_img.to(device), hr_img.to(device), feats.to(device)
             
             # Get landmarks for patch loss (Task 6)
             with torch.no_grad():
-                # HR landmarks as ground truth
-                hr_np = (hr[0].permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+                hr_np = (hr_img[0].permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
                 face = arcface.model.get_face_info(hr_np)
-                landmarks = [face.kps] * hr.shape[0] if face else None
+                landmarks = [face.kps] * hr_img.shape[0] if face else None
             
             optimizer.zero_grad()
-            # Task 2: Reduced residual scale for stability
-            sr, _, _ = model(lr, feats, residual_scale=0.05)
+            sr, _, _ = model(lr_img, feats, residual_scale=residual_scale)
             
             # Task 4: Residual-Only Learning Objective
-            # loss = ||(SR - Bicubic) - (GT - Bicubic)||
-            bicubic = F.interpolate(lr, size=(512, 512), mode='bilinear')
+            bicubic = F.interpolate(lr_img, size=(512, 512), mode='bilinear')
             
             # Task 9: Identity-Dominant Loss Stack
-            loss_l1 = criterion_l1(sr, hr)
-            loss_msssim = 1.0 - ms_ssim(sr, hr, data_range=1.0, size_average=True)
-            loss_id = vgg(sr, hr)
-            loss_fft = fft(sr, hr)
-            loss_edge = sobel(sr, hr)
-            
-            # Task 11: Bicubic Difference Penalty
+            loss_l1 = criterion_l1(sr, hr_img)
+            loss_msssim = 1.0 - ms_ssim(sr, hr_img, data_range=1.0, size_average=True)
+            loss_id = vgg(sr, hr_img)
+            loss_fft = fft(sr, hr_img)
+            loss_edge = sobel(sr, hr_img)
             loss_drift = criterion_l1(sr, bicubic)
             
             # Task 6: Identity Patch Loss
             if landmarks:
                 sr_patches = extract_identity_patches(sr, landmarks)
-                hr_patches = extract_identity_patches(hr, landmarks)
+                hr_patches = extract_identity_patches(hr_img, landmarks)
                 loss_patch = criterion_l1(sr_patches, hr_patches)
             else:
                 loss_patch = 0
                 
             total_loss = (
                 1.0 * loss_l1 + 
-                2.0 * loss_msssim + 
-                4.0 * loss_id + 
+                ssim_weight * loss_msssim + 
+                identity_weight * loss_id + 
                 1.0 * loss_patch +
                 0.5 * loss_drift +
-                0.5 * loss_fft + 
-                0.3 * loss_edge
+                fft_weight * loss_fft + 
+                sobel_weight * loss_edge
             )
             
             total_loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5) # Task 3: Harder clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
             
             epoch_loss += total_loss.item()
@@ -194,9 +192,12 @@ def train_convergence(epochs=200, batch_size=8, subset=5000):
         scheduler.step()
         print(f"Epoch {epoch}/{epochs} | Loss: {epoch_loss/len(loader):.4f}")
         
-        if epoch % 5 == 0:
-            ckpt_path = ckpt_dir / 'swin_fuzzy_lcr_convergence.pth'
+        if epoch % save_every == 0:
+            ckpt_path = ckpt_dir / f'swin_fuzzy_lcr_epoch_{epoch}.pth'
+            # Also save as master for inference
+            master_path = ckpt_dir / 'swin_fuzzy_lcr_convergence.pth'
             torch.save(model.state_dict(), ckpt_path)
+            torch.save(model.state_dict(), master_path)
             
             # Task 9: Verify Checkpoint immediately
             try:
@@ -221,8 +222,33 @@ def train_convergence(epochs=200, batch_size=8, subset=5000):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--subset', type=int, default=5000)
+    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--save_every', type=int, default=5)
+    parser.add_argument('--identity_weight', type=float, default=4.0)
+    parser.add_argument('--ssim_weight', type=float, default=1.0)
+    parser.add_argument('--fft_weight', type=float, default=0.5)
+    parser.add_argument('--sobel_weight', type=float, default=0.5)
+    parser.add_argument('--residual_scale', type=float, default=0.05)
+    parser.add_argument('--blend_alpha', type=float, default=0.85)
+    parser.add_argument('--disable_fallback', action='store_true')
+    parser.add_argument('--save_visuals', action='store_true')
     args = parser.parse_args()
     
-    train_convergence(epochs=args.epochs, subset=args.subset)
+    train_convergence(
+        epochs=args.epochs, 
+        subset=args.subset,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        save_every=args.save_every,
+        identity_weight=args.identity_weight,
+        ssim_weight=args.ssim_weight,
+        fft_weight=args.fft_weight,
+        sobel_weight=args.sobel_weight,
+        residual_scale=args.residual_scale,
+        blend_alpha=args.blend_alpha,
+        disable_fallback=args.disable_fallback,
+        save_visuals=args.save_visuals
+    )

@@ -125,6 +125,9 @@ def main():
     parser.add_argument('--n_images', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--restoration_mode', action='store_true', help='Enable RESTORATION mode (relaxed gates)')
+    parser.add_argument('--strict_sr_only', action='store_true')
+    parser.add_argument('--save_heatmaps', action='store_true')
+    parser.add_argument('--save_diagnostics', action='store_true')
     args = parser.parse_args()
     dbg = reset_logger(run_id=f"eval_{np.datetime64('now').astype(str).replace(':', '').replace('-', '').replace('T', '_')}")
     dbg.info(f"evaluate start args={vars(args)}")
@@ -145,6 +148,10 @@ def main():
         pipeline.production_mode = True 
         pipeline.restoration_mode = False
         print("  [AUDIT] Production Mode ACTIVE (Strict Gates)")
+        
+    if args.strict_sr_only:
+        pipeline.allow_fallback = False
+        print("  [AUDIT] Strict SR-Only Mode ENABLED (Fallback Disabled)")
         
     pipeline.load_pretrained()
 
