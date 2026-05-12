@@ -162,7 +162,29 @@ def train_convergence(epochs=200, batch_size=8, subset=5000):
         print(f"Epoch {epoch}/{epochs} | Loss: {epoch_loss/len(loader):.4f}")
         
         if epoch % 5 == 0:
-            torch.save(model.state_dict(), ckpt_dir / 'swin_fuzzy_lcr_convergence.pth')
+            ckpt_path = ckpt_dir / 'swin_fuzzy_lcr_convergence.pth'
+            torch.save(model.state_dict(), ckpt_path)
+            
+            # Task 9: Verify Checkpoint immediately
+            try:
+                test_model = SwinFuzzyLCR(feature_dim=64).to(device)
+                test_model.load_state_dict(torch.load(ckpt_path, map_location=device))
+                test_model.eval()
+                with torch.no_grad():
+                    # Dummy forward pass
+                    _ = test_model(lr[:1], feats[:1])
+                print(f"  ✓ Checkpoint Verified: {ckpt_path.name}")
+            except Exception as e:
+                print(f"  ⚠ CRITICAL: Checkpoint verification failed: {e}")
+
+    # Task 10: Final Training Summary
+    print("\n" + "="*60)
+    print("CONVERGENCE TRAINING COMPLETE")
+    print("="*60)
+    print(f"Total Epochs: {epochs}")
+    print(f"Final Loss:   {epoch_loss/len(loader):.4f}")
+    print(f"Checkpoint:   {ckpt_dir / 'swin_fuzzy_lcr_convergence.pth'}")
+    print("="*60 + "\n")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

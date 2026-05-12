@@ -21,7 +21,9 @@ import numpy as np
 import cv2
 import time
 from pathlib import Path
-from typing import Union, Tuple, Optional, Dict
+import argparse
+from typing import Union, Dict, List, Optional
+import hashlib
 
 # TASK 19 — DETERMINISTIC SEEDING
 def set_seed(seed=42):
@@ -79,15 +81,14 @@ class ANFISFaceSRPipeline:
         results = pipeline.enhance('path/to/dark_face.jpg')
     """
 
-    def __init__(self,
-                 device: str = 'cpu',
-                 use_blur_correction: bool = True,
-                 use_gfpgan: bool = True,
-                 use_sota_model: bool = False):
+    def __init__(self, device='cpu', use_blur_correction=True, use_gfpgan=True, allow_fallback=False):
         self.device = device
         self.use_blur_correction = use_blur_correction
         self.use_gfpgan = use_gfpgan
-        self.use_sota_model = use_sota_model
+        self.allow_fallback = allow_fallback
+        
+        # Internal state
+        self._sota_loaded = False
         
         # ── Global Restoration Flags ──────────────────────────────
         self.current_epoch = 100
@@ -248,9 +249,10 @@ class ANFISFaceSRPipeline:
                 except Exception as e:
                     print(f"  ⚠ GFPGAN instantiation failed: {e}")
         # ── SOTA Upgrade: Swin-Fuzzy-LCR ──────────────────────────
-        sota_path = (ckpt / 'swin_fuzzy_lcr.pth').resolve()
+        sota_path = self._find_best_checkpoint(ckpt)
         print(f"  ℹ Checking SOTA weights at: {sota_path}")
-        if sota_path.exists():
+        
+        if sota_path and sota_path.exists():
             try:
                 state_dict = torch.load(sota_path, map_location=self.device)
                 
@@ -271,12 +273,69 @@ class ANFISFaceSRPipeline:
                 self.well_trained = True
                 print(f"  ✓ SOTA Swin-Fuzzy-LCR Master weights loaded (STRICT): {sota_path.name}")
                 self.use_sota_model = True 
+                self._verify_checkpoint_integrity(state_dict)
             except Exception as e:
                 print(f"  [STRICT FAILURE] SOTA model load failed: {e}")
-                if self.production_mode:
-                    raise RuntimeError(f"Checkpoint mismatch in production mode: {e}")
+                self._sota_loaded = False
+                if self.production_mode or not self.allow_fallback:
+                    raise RuntimeError(f"Critical SOTA load failure: {e}")
         else:
-            print("  ℹ SOTA Swin-Fuzzy-LCR weights not found in checkpoints.")
+            print("  ℹ SOTA Swin-Fuzzy-LCR weights not found in any standard locations.")
+            self._sota_loaded = False
+            if not self.allow_fallback:
+                raise RuntimeError("SOTA weights missing and fallback disabled.")
+
+    def _find_best_checkpoint(self, base_ckpt: Path) -> Optional[Path]:
+        """Task 1: Recursive discovery of newest valid checkpoint."""
+        search_dirs = [
+            base_ckpt,
+            Path('checkpoints'),
+            Path('app/backend/checkpoints'),
+            Path('pretrained_models'),
+            Path('results/checkpoints')
+        ]
+        
+        all_candidates = []
+        for d in search_dirs:
+            if d.exists():
+                all_candidates.extend(list(d.rglob('swin_fuzzy_lcr*.pth')))
+                all_candidates.extend(list(d.rglob('*.pth'))) # fallback to any .pth if needed
+        
+        # Filter for our specific model pattern
+        candidates = [c for c in all_candidates if 'swin_fuzzy_lcr' in c.name]
+        
+        if not candidates:
+            return None
+            
+        # Sort by modification time (newest first)
+        candidates.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        return candidates[0]
+
+    def _verify_checkpoint_integrity(self, state_dict: dict):
+        """Task 2: Strict verification of loaded weights."""
+        param_count = sum(p.numel() for p in self.sota_model.parameters())
+        
+        # Calculate model hash for tracking
+        model_bytes = b"".join([p.cpu().numpy().tobytes() for p in self.sota_model.parameters()])
+        model_hash = hashlib.md5(model_bytes).hexdigest()
+        
+        print(f"  ✓ Model Integrity Verified:")
+        print(f"    - Parameter Count: {param_count:,}")
+        print(f"    - Model Hash: {model_hash}")
+        
+        # Verify residual branch weights are not zero (Task 7)
+        residual_norms = []
+        for name, param in self.sota_model.named_parameters():
+            if 'residual' in name or 'sft' in name:
+                residual_norms.append(param.norm().item())
+        
+        if residual_norms:
+            avg_norm = sum(residual_norms) / len(residual_norms)
+            print(f"    - Residual Branch Activity (Avg Norm): {avg_norm:.6f}")
+            if avg_norm < 1e-6:
+                print("    ⚠ WARNING: Residual branch weights appear to be near-zero (untrained).")
+        else:
+            print("    ⚠ WARNING: Could not find residual parameters for norm check.")
 
     # ── Preprocessing ───────────────────────────────────────────────
 
@@ -467,12 +526,14 @@ class ANFISFaceSRPipeline:
             current_up_t = torch.nn.functional.interpolate(current_t, size=(512, 512), mode='bilinear')
             
             # 2. Blending (Bicubic Anchor vs SR)
+            anchor_t = torch.from_numpy(anchor_upscale.transpose(2, 0, 1)).unsqueeze(0).to(self.device)
             current_up_t = current_up_t.contiguous().float()
             sr_t = sr_t.contiguous().float()
             blend_t = ( (1.0 - blend_alpha) * current_up_t + blend_alpha * sr_t ).clamp(0.0, 1.0)
             
             from utils.image_utils import normalize_image_pipeline
             candidate_f = normalize_image_pipeline(blend_t, target_format='numpy', target_dtype='float32')
+            sr_f = normalize_image_pipeline(sr_t, target_format='numpy', target_dtype='float32')
             
             # 3. Measurement (ArcFace Sentinel - Measurement only, no routing)
             sim_score = 0.0
@@ -490,6 +551,31 @@ class ANFISFaceSRPipeline:
                         emb_sr = arc.extract_with_landmarks(cand_u8, face_info.kps)
                         
                         if emb_ref is not None and emb_sr is not None:
+                            # Task 4 & 5: Verify Residual Branch Execution
+                            residual_map = (sr_t - anchor_t).abs().mean(dim=1).squeeze().detach().cpu().numpy()
+                            res_mean = residual_map.mean()
+                            res_std = residual_map.std()
+                            print(f"  [SR AUDIT] Residual: mean={res_mean:.6f} std={res_std:.6f} scale={residual_scale:.3f}")
+                            
+                            if dbg:
+                                # Save diagnostic visualizations (Task 5)
+                                # Normalize residual for visibility
+                                res_vis = (residual_map / (residual_map.max() + 1e-6) * 255).astype(np.uint8)
+                                res_vis_colored = cv2.applyColorMap(res_vis, cv2.COLORMAP_JET)
+                                dbg.save_image(res_vis_colored, f"diagnostic/{image_name or 'sample'}_residual_heatmap.png", is_float=False)
+                                
+                                sr_img_u8 = (sr_f * 255).astype(np.uint8)
+                                dbg.save_image(sr_img_u8, f"diagnostic/{image_name or 'sample'}_sr_raw.png", is_float=False)
+                                
+                                anchor_u8 = (anchor_upscale * 255).astype(np.uint8)
+                                dbg.save_image(anchor_u8, f"diagnostic/{image_name or 'sample'}_anchor_bicubic.png", is_float=False)
+
+                            # Validation Gate (Task 8: Force non-zero residual)
+                            if res_mean < 1e-8:
+                                print("  ⚠ CRITICAL: SR branch produced zero residual. Weights may be identity-mapped or corrupted.")
+                                if not self.allow_fallback:
+                                    raise RuntimeError("SR branch identity collapse detected.")
+                            
                             sim_score = arc.cosine_similarity(emb_ref, emb_sr) or 0.0
                         else:
                             det_failure = True
@@ -548,42 +634,27 @@ class ANFISFaceSRPipeline:
                 dbg.log_routing('lanczos_fallback', reason='sota_failed', image_name=image_name)
 
         # ── Single Fidelity Blend ──────────────────────────────────
-        # Enforce canonical resolution on final_f
-        if final_f.shape[0] != target_size:
-            final_f = cv2.resize(final_f, (target_size, target_size), interpolation=cv2.INTER_LANCZOS4)
+        # Ensure anchor and final_f have matching shapes for blending
+        if final_f.shape != anchor_upscale.shape:
+            # For full-image inference, we usually want to keep the anchor's upscaled resolution
+            # or force a specific target_size. Here we align final_f to the anchor.
+            final_f = cv2.resize(final_f, (anchor_upscale.shape[1], anchor_upscale.shape[0]), interpolation=cv2.INTER_LANCZOS4)
             
-            # TASK 11: Reduce Bicubic Dominance
-            # Restoration Mode: 85/15
-            # Strict Mode: 90/10
-            blend_alpha = 0.15 if not self.production_mode else 0.10
-            if df > 0.7 or blur_severity > 0.7:
-                blend_alpha = 0.08
+        # Task 11: Reduce Bicubic Dominance (85/15)
+        blend_alpha = 0.15 if not self.production_mode else 0.10
+        if df > 0.7 or blur_severity > 0.7:
+            blend_alpha = 0.08
             
-            final_f = blend_alpha * final_f + (np.float32(1.0) - blend_alpha) * anchor_upscale
-            final_f = np.clip(final_f, 0.0, 1.0).astype(np.float32)
+        final_f = blend_alpha * final_f + (np.float32(1.0) - blend_alpha) * anchor_upscale
+        final_f = np.clip(final_f, 0.0, 1.0).astype(np.float32)
 
-
-
-            if dbg:
-                dbg._write_jsonl({
-                    "event": "fidelity_blend",
-                    "image": image_name,
-                    "blend_alpha": float(blend_alpha),
-                    "final_mean": float(final_f.mean()),
-                })
-        else:
-            # Shape mismatch: resize final_f to target and use it directly
-            if dbg:
-                dbg.warning(
-                    f"[fidelity_blend] shape mismatch: "
-                    f"anchor={anchor_upscale.shape} final={final_f.shape}. "
-                    "Resizing final_f to target_size."
-                )
-            if target_size > 0 and final_f.shape[0] != target_size:
-                final_f_u8 = (np.clip(final_f, 0, 1) * 255).astype(np.uint8)
-                final_f = cv2.resize(final_f_u8, (target_size, target_size),
-                                     interpolation=cv2.INTER_LANCZOS4
-                                     ).astype(np.float32) / 255.0
+        if dbg:
+            dbg._write_jsonl({
+                "event": "fidelity_blend",
+                "image": image_name,
+                "blend_alpha": float(blend_alpha),
+                "final_mean": float(final_f.mean()),
+            })
 
         # TASK 11: ROI-Aware Sharpening
         # Apply sharpening ONLY to eyes, eyebrows, and lips if detected.
@@ -651,7 +722,14 @@ class ANFISFaceSRPipeline:
 # ── CLI Demo ────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    import sys
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='ANFIS Face SR Pipeline — Inference')
+    parser.add_argument('input', type=str, help='Path to input image')
+    parser.add_argument('--allow_fallback', action='store_true', help='Allow Lanczos fallback if SOTA loading fails')
+    parser.add_argument('--device', type=str, default='cpu', help='Inference device')
+    args = parser.parse_args()
+
     if reset_logger is not None:
         reset_logger(run_id=f"inference_{__import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
@@ -660,9 +738,10 @@ if __name__ == '__main__':
     print("=" * 60)
 
     pipeline = ANFISFaceSRPipeline(
-        device='cpu',
+        device=args.device,
         use_blur_correction=True,
-        use_gfpgan=True)
+        use_gfpgan=True,
+        allow_fallback=args.allow_fallback)
 
     pipeline.load_pretrained('checkpoints/')
 

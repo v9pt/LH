@@ -188,6 +188,14 @@ def main():
         'niqe': [],
     }
     
+    # Task 6: Separate SR and Fallback stats
+    sr_stats = {
+        'psnr': [], 'ssim': [], 'lpips': [], 'id_sim': [], 'musiq': []
+    }
+    fb_stats = {
+        'psnr': [], 'ssim': [], 'lpips': [], 'id_sim': [], 'musiq': []
+    }
+    
     # TASK 13: Pipeline Health Dashboard (Expanded)
     health = {
         'total_samples': args.n_images,
@@ -367,8 +375,18 @@ def main():
             # TASK 7, 12: Mark as valid only if it's a complete evaluation
             if sim is not None:
                 health['valid_metrics_samples'] += 1
+                
+                # Task 6: Separate metrics aggregation
+                target_stats = sr_stats if results.get('sota_promoted', False) else fb_stats
+                target_stats['psnr'].append(psnr_val)
+                target_stats['ssim'].append(ssim_val_img)
+                target_stats['lpips'].append(lpips_val)
+                target_stats['id_sim'].append(sim)
+                if 'musiq_val' in locals(): target_stats['musiq'].append(musiq_val)
+
                 if results.get('sota_promoted', False):
                     health['sota_promoted'] += 1
+                    
             if results.get('fallback_enforced', False):
                 health['fallback_count'] += 1
 
@@ -401,11 +419,15 @@ def main():
     print("║ Face Identity Similarity  :    %5.2f%%   | Target: 82%%   [%s] ║" % (id_val, tag(id_val, 82.0)))
     print("║ Restoration Fidelity(SSIM):    %5.2f%%   | Target: 65%%   [%s] ║" % (ssim_val, tag(ssim_val, 65.0)))
     print("╠" + "═" * 58 + "╣")
-    print("║ HEALTH: DetSuccess: %3.0f%%, SR_Promote: %3.0f%%, Fail: %d  ║" % (
-        (health['det_success']/health['total_samples'])*100 if health['total_samples'] else 0,
-        (health['sota_promoted']/health['total_samples'])*100 if health['total_samples'] else 0,
-        health['runtime_errors']
-    ))
+    # Task 6: Separate Dashboard display
+    sr_psnr = np.mean(sr_stats['psnr']) if sr_stats['psnr'] else 0.0
+    sr_id = np.mean(sr_stats['id_sim']) * 100 if sr_stats['id_sim'] else 0.0
+    fb_psnr = np.mean(fb_stats['psnr']) if fb_stats['psnr'] else 0.0
+    fb_id = np.mean(fb_stats['id_sim']) * 100 if fb_stats['id_sim'] else 0.0
+
+    print("║ TRUE SR Performance (ID/PSNR) :   %5.2f%% / %5.2fdB      ║" % (sr_id, sr_psnr))
+    print("║ FALLBACK Performance (ID/PSNR):   %5.2f%% / %5.2fdB      ║" % (fb_id, fb_psnr))
+    print("╠" + "═" * 58 + "╣")
     print("║ PSNR / LPIPS              :    %5.2fdB / %.3f             ║" % (psnr_avg, lpips_avg))
     print("║ MUSIQ Perceptual Score    :    %5.2f (Higher is better)     ║" % musiq_avg)
     print("╚" + "═" * 58 + "╝")
