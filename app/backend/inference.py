@@ -520,7 +520,9 @@ class ANFISFaceSRPipeline:
                 blend_alpha = 0.05
             
             # Input Prep [1, 3, 64, 64]
-            current_t = self._to_tensor(current).to(self.device).float()
+            # Task 18: Resolution Alignment (Force 64x64 input)
+            current_64 = cv2.resize(current, (64, 64), interpolation=cv2.INTER_AREA)
+            current_t = self._to_tensor(current_64).to(self.device).float()
             feats = extract_illumination_features(image)
             # TASK 11: Use 5-D feature subset (synchronized)
             cond_t = torch.from_numpy(feats[:5]).unsqueeze(0).to(self.device).float()

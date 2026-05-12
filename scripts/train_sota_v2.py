@@ -128,7 +128,14 @@ def train_convergence(epochs=200, batch_size=8, subset=5000, lr=1e-4, save_every
     fft = FFTLoss().to(device)
     vgg = VGGPercLoss().to(device)
     
-    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
+    # Task 5: Freeze Early Structure (Stem)
+    # We freeze the initial feature extraction and SFT modulation
+    # to prevent the model from relearning/destroying basic face geometry.
+    for name, param in model.named_parameters():
+        if 'feat_extract' in name or 'sft' in name:
+            param.requires_grad = False
+            
+    optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=lr, weight_decay=1e-2)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     
     # 3. Data
@@ -173,15 +180,26 @@ def train_convergence(epochs=200, batch_size=8, subset=5000, lr=1e-4, save_every
             else:
                 loss_patch = 0
                 
+            # Task 10: Progressive Curriculum (Stage-based Identity focus)
+            # Epoch 1-10: Low ID weight to stabilize geometry
+            # Epoch 11+: High ID weight to refine features
+            current_id_weight = 1.0 if epoch <= 10 else identity_weight
+            
             total_loss = (
                 1.0 * loss_l1 + 
                 ssim_weight * loss_msssim + 
-                identity_weight * loss_id + 
+                current_id_weight * loss_id + 
                 1.0 * loss_patch +
                 0.5 * loss_drift +
                 fft_weight * loss_fft + 
                 sobel_weight * loss_edge
             )
+            
+            # Task 7: Zero Residual Audit during training
+            with torch.no_grad():
+                res_mag = torch.abs(sr - bicubic).mean().item()
+                if res_mag < 1e-7 and epoch > 1:
+                    print("  ⚠ WARNING: Potential Residual Collapse detected (ResMag < 1e-7)")
             
             total_loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)

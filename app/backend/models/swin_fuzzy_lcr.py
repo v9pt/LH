@@ -273,8 +273,9 @@ class SwinFuzzyLCR(nn.Module):
         out = self.reconstruction(lcr_latent)
         
         # TASK 3 & 4: Strict Residual Clamping [-0.04, 0.04]
-        # Align with "Pure Residual Mode": SR = Bicubic + Clamped(Residual)
-        x_up = F.interpolate(x, size=(512, 512), mode='bilinear', align_corners=False)
+        # TASK 18: Resolution Alignment (Dynamic Anchor)
+        # Ensure anchor size matches model output resolution (out.shape)
+        x_up = F.interpolate(x, size=(out.shape[2], out.shape[3]), mode='bilinear', align_corners=False)
         residual = out - x_up
         
         # Strict range prevents geometry distortion (Task 3)
