@@ -148,7 +148,7 @@ def train_convergence(epochs=200, batch_size=8, subset=5000, lr=1e-4, save_every
             # Get landmarks for patch loss (Task 6)
             with torch.no_grad():
                 hr_np = (hr_img[0].permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
-                face = arcface.model.get_face_info(hr_np)
+                face = arcface.get_face_info(hr_np)
                 landmarks = [face.kps] * hr_img.shape[0] if face else None
             
             optimizer.zero_grad()
