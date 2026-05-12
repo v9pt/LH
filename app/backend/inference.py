@@ -315,9 +315,11 @@ class ANFISFaceSRPipeline:
         """Task 2: Strict verification of loaded weights."""
         param_count = sum(p.numel() for p in self.sota_model.parameters())
         
-        # Calculate model hash for tracking
-        model_bytes = b"".join([p.cpu().numpy().tobytes() for p in self.sota_model.parameters()])
-        model_hash = hashlib.md5(model_bytes).hexdigest()
+        # Task 2: SAFE PARAMETER HASHING (No grad tracking)
+        with torch.no_grad():
+            # Calculate model hash for tracking (Task 1: Use .detach())
+            model_bytes = b"".join([p.detach().cpu().numpy().tobytes() for p in self.sota_model.parameters()])
+            model_hash = hashlib.md5(model_bytes).hexdigest()
         
         print(f"  ✓ Model Integrity Verified:")
         print(f"    - Parameter Count: {param_count:,}")
@@ -443,7 +445,9 @@ class ANFISFaceSRPipeline:
         img_rgb = image
         
         # TASK 17: Re-enable real ANFIS estimation
-        df, _ = self.darkness_estimator.estimate(image, return_debug=True)
+        # TASK 3: Disable ANFIS influence during SR convergence
+        # Forcing darkness_factor to neutral 0.5 to prevent rule collapse interference.
+        df = 0.5
         
         blur_info = self.blur_analyzer.analyze(image)
         blur_severity = blur_info['blur_severity']
@@ -573,10 +577,10 @@ class ANFISFaceSRPipeline:
                                 dbg.save_image(anchor_u8, f"diagnostic/{image_name or 'sample'}_anchor_bicubic.png", is_float=False)
 
                             # Validation Gate (Task 8: Force non-zero residual)
-                            if res_mean < 1e-8:
-                                print("  ⚠ CRITICAL: SR branch produced zero residual. Weights may be identity-mapped or corrupted.")
+                            if res_mean < 1e-8 or res_std < 1e-8:
+                                print(f"  ⚠ CRITICAL: SR branch produced zero residual (mean={res_mean:.8f}).")
                                 if not self.allow_fallback:
-                                    raise RuntimeError("SR branch identity collapse detected.")
+                                    raise RuntimeError("SR branch identity collapse detected (Zero residuals).")
                             
                             sim_score = arc.cosine_similarity(emb_ref, emb_sr) or 0.0
                         else:

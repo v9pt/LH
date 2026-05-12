@@ -206,7 +206,7 @@ def train_convergence(epochs=200, batch_size=8, subset=5000, lr=1e-4, save_every
                 test_model.eval()
                 with torch.no_grad():
                     # Dummy forward pass
-                    _ = test_model(lr[:1], feats[:1])
+                    _ = test_model(lr_img[:1], feats[:1])
                 print(f"  ✓ Checkpoint Verified: {ckpt_path.name}")
             except Exception as e:
                 print(f"  ⚠ CRITICAL: Checkpoint verification failed: {e}")
