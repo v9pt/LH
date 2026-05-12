@@ -505,12 +505,14 @@ class ANFISFaceSRPipeline:
             # TASK 4, 11, 15: Two-Mode Inference
             # RESTORATION mode (Task 15) uses stronger residuals and less bicubic dominance.
             # TASK 1, 2: Relaxing constraints for CONVERGENCE (Task 1, 2)
+            # TASK 2, 12: Identity-Safe Inference (Conservative residuals)
+            # RESTORATION mode (Task 15) uses stricter bounds to prevent drift.
             if self.restoration_mode:
-                residual_scale = 0.10 # Increased from 0.04 (Task 2)
-                blend_alpha = 0.20    # Increased from 0.08 (Task 1)
+                residual_scale = 0.05 
+                blend_alpha = 0.08    
             else:
-                residual_scale = 0.06 
-                blend_alpha = 0.10
+                residual_scale = 0.03 
+                blend_alpha = 0.05
             
             # Input Prep [1, 3, 64, 64]
             current_t = self._to_tensor(current).to(self.device).float()

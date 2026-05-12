@@ -272,14 +272,13 @@ class SwinFuzzyLCR(nn.Module):
         # 6. Upsample and Reconstruct
         out = self.reconstruction(lcr_latent)
         
-        # TASK 6: Hard Residual Clamping
-        # TASK 3: Relaxed Clamping for CONVERGENCE [-0.15, 0.15]
+        # TASK 3 & 4: Strict Residual Clamping [-0.04, 0.04]
         # Align with "Pure Residual Mode": SR = Bicubic + Clamped(Residual)
         x_up = F.interpolate(x, size=(512, 512), mode='bilinear', align_corners=False)
         residual = out - x_up
         
-        # Relaxed range allows for learning meaningful high-frequency corrections
-        clamped_residual = torch.clamp(residual, -0.15, 0.15) * residual_scale
+        # Strict range prevents geometry distortion (Task 3)
+        clamped_residual = torch.clamp(residual, -0.04, 0.04) * residual_scale
         
         final_out = (x_up + clamped_residual).clamp(0.0, 1.0)
         

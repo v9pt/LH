@@ -185,6 +185,7 @@ def main():
     stats = {
         'psnr': [], 'ssim': [], 'lpips': [],
         'id_sim': [], 'musiq': [], 'anfis_acc': [],
+        'id_drift': [], # Task 14: Bicubic vs SR similarity
         'niqe': [],
     }
     
@@ -329,6 +330,14 @@ def main():
                     health['alignment_success'] += 1
                     sim = arcface.cosine_similarity(emb_gt, emb_sr)
                     stats['id_sim'].append(sim)
+                    
+                    # Task 14: Identity Drift Audit (Bicubic vs SR)
+                    emb_bic = arcface.extract_with_landmarks(bicubic_u8, face_info_gt.kps)
+                    if emb_bic is not None:
+                        drift_sim = arcface.cosine_similarity(emb_bic, emb_sr)
+                        stats['id_drift'].append(drift_sim)
+                        dbg.log_embedding(drift_sim, "sr_vs_bicubic", image_name=image_name)
+                    
                     dbg.log_embedding(sim, "sr_vs_gt", image_name=image_name)
                 else:
                     health['det_failure_sr'] += 1
@@ -427,8 +436,11 @@ def main():
 
     print("║ TRUE SR Performance (ID/PSNR) :   %5.2f%% / %5.2fdB      ║" % (sr_id, sr_psnr))
     print("║ FALLBACK Performance (ID/PSNR):   %5.2f%% / %5.2fdB      ║" % (fb_id, fb_psnr))
+    # Task 14: Drift Report
+    drift_val = np.mean(stats['id_drift']) * 100 if stats['id_drift'] else 0.0
+    print("║ Identity Preservation (Drift):    %5.2f%%   | Target: 95%%   [%s] ║" % (drift_val, tag(drift_val, 95.0)))
     print("╠" + "═" * 58 + "╣")
-    print("║ PSNR / LPIPS              :    %5.2fdB / %.3f             ║" % (psnr_avg, lpips_avg))
+    print("║ PSNR / SSIM               :    %5.2fdB / %.2f%%            ║" % (psnr_avg, ssim_val))
     print("║ MUSIQ Perceptual Score    :    %5.2f (Higher is better)     ║" % musiq_avg)
     print("╚" + "═" * 58 + "╝")
 

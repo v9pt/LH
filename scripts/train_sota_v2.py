@@ -10,6 +10,7 @@ import numpy as np
 import cv2
 import sys, os
 import argparse
+from pytorch_msssim import ms_ssim
 
 # Project imports
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,29 +44,35 @@ class FFTLoss(nn.Module):
         y_fft = torch.fft.rfft2(y, norm='ortho')
         return F.l1_loss(torch.abs(x_fft), torch.abs(y_fft))
 
-class LaplacianLoss(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.kernel = torch.tensor([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=torch.float32).view(1, 1, 3, 3)
-
-    def forward(self, x, y):
-        k = self.kernel.to(x.device)
-        lx = F.conv2d(x.mean(dim=1, keepdim=True), k, padding=1)
-        ly = F.conv2d(y.mean(dim=1, keepdim=True), k, padding=1)
-        return F.l1_loss(lx, ly)
-
 class VGGPercLoss(nn.Module):
     def __init__(self):
         super().__init__()
-        from torchvision import models
-        vgg = models.vgg16(pretrained=True).features.eval()
+        from torchvision.models import vgg16
+        vgg = vgg16(pretrained=True).features[:17].eval()
         for p in vgg.parameters(): p.requires_grad = False
         self.vgg = vgg
+        self.register_buffer("mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
+        self.register_buffer("std", torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
 
-    def forward(self, x, y, layer_idx=9):
-        feat_x = self.vgg[:layer_idx](x)
-        feat_y = self.vgg[:layer_idx](y)
-        return F.mse_loss(feat_x, feat_y)
+    def forward(self, x, y, layer_idx=16):
+        x = (x - self.mean) / self.std
+        y = (y - self.mean) / self.std
+        return F.l1_loss(self.vgg(x), self.vgg(y))
+
+def extract_identity_patches(img_t, landmarks):
+    """Task 6: Crop eyes, nose, mouth patches from 512x512 image."""
+    # Assuming standard landmarks (InsightFace 5 points)
+    patches = []
+    B = img_t.shape[0]
+    for b in range(B):
+        if landmarks[b] is None: continue
+        for pt_idx in range(min(5, len(landmarks[b]))):
+            cx, cy = landmarks[b][pt_idx].astype(int)
+            # 64x64 patch
+            x1 = max(0, cx - 32); x2 = min(512, cx + 32)
+            y1 = max(0, cy - 32); y2 = min(512, cy + 32)
+            patches.append(img_t[b:b+1, :, y1:y2, x1:x2])
+    return torch.cat(patches, dim=0) if patches else img_t
 
 # ─── Dataset & Training Logic ───────────────────────────────────────────────
 
@@ -110,14 +117,12 @@ def train_convergence(epochs=200, batch_size=8, subset=5000):
     
     # 1. Models
     model = SwinFuzzyLCR(feature_dim=64).to(device)
-    # ArcFace is used for metrics/logging (CPU usually best for InsightFace)
     arcface = ArcFaceModel(device='cpu') 
     
     # 2. Loss & Optimizer
     criterion_l1 = nn.L1Loss()
     sobel = SobelLoss().to(device)
     fft = FFTLoss().to(device)
-    laplacian = LaplacianLoss().to(device)
     vgg = VGGPercLoss().to(device)
     
     optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
@@ -125,14 +130,10 @@ def train_convergence(epochs=200, batch_size=8, subset=5000):
     
     # 3. Data
     data_path = 'data/img_align_celeba'
-    if not os.path.exists(data_path):
-        print(f"⚠ {data_path} not found.")
-        return
-        
     dataset = CelebADataset(data_path, subset_size=subset)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
     
-    print(f"Starting CONVERGENCE TRAINING | Device={device} | Subset={len(dataset)}")
+    print(f"Starting IDENTITY-SAFE TRAINING | Device={device} | Subset={len(dataset)}")
     
     for epoch in range(1, epochs + 1):
         model.train()
@@ -141,19 +142,51 @@ def train_convergence(epochs=200, batch_size=8, subset=5000):
         for lr, hr, feats in loader:
             lr, hr, feats = lr.to(device), hr.to(device), feats.to(device)
             
+            # Get landmarks for patch loss (Task 6)
+            with torch.no_grad():
+                # HR landmarks as ground truth
+                hr_np = (hr[0].permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+                face = arcface.model.get_face_info(hr_np)
+                landmarks = [face.kps] * hr.shape[0] if face else None
+            
             optimizer.zero_grad()
-            sr, _, _ = model(lr, feats, residual_scale=0.15)
+            # Task 2: Reduced residual scale for stability
+            sr, _, _ = model(lr, feats, residual_scale=0.05)
             
+            # Task 4: Residual-Only Learning Objective
+            # loss = ||(SR - Bicubic) - (GT - Bicubic)||
+            bicubic = F.interpolate(lr, size=(512, 512), mode='bilinear')
+            
+            # Task 9: Identity-Dominant Loss Stack
             loss_l1 = criterion_l1(sr, hr)
-            loss_edge = sobel(sr, hr)
+            loss_msssim = 1.0 - ms_ssim(sr, hr, data_range=1.0, size_average=True)
+            loss_id = vgg(sr, hr)
             loss_fft = fft(sr, hr)
-            loss_lap = laplacian(sr, hr)
-            loss_id = vgg(sr, hr, layer_idx=16) 
+            loss_edge = sobel(sr, hr)
             
-            total_loss = (1.0 * loss_l1 + 4.0 * loss_id + 0.5 * loss_fft + 0.3 * loss_edge + 0.2 * loss_lap)
+            # Task 11: Bicubic Difference Penalty
+            loss_drift = criterion_l1(sr, bicubic)
+            
+            # Task 6: Identity Patch Loss
+            if landmarks:
+                sr_patches = extract_identity_patches(sr, landmarks)
+                hr_patches = extract_identity_patches(hr, landmarks)
+                loss_patch = criterion_l1(sr_patches, hr_patches)
+            else:
+                loss_patch = 0
+                
+            total_loss = (
+                1.0 * loss_l1 + 
+                2.0 * loss_msssim + 
+                4.0 * loss_id + 
+                1.0 * loss_patch +
+                0.5 * loss_drift +
+                0.5 * loss_fft + 
+                0.3 * loss_edge
+            )
             
             total_loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5) # Task 3: Harder clipping
             optimizer.step()
             
             epoch_loss += total_loss.item()
