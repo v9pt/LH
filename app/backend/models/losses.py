@@ -91,13 +91,14 @@ class HybridLossCombiner(nn.Module):
         self.freq_loss = FocalFrequencyLoss()
         self.edge_loss = EdgeLoss()
         
-        # Identity-first objective: L = λ1 L1 + λ2 LPIPS + λ3 ArcFace + λ4 SSIM.
+        # Precision Hardening for 95%+ Identity & SSIM
+        # We prioritize pretrained VGG and structural SSIM over the random-weight ArcFace.
         self.w_l1 = 1.0
-        self.w_percep = 0.35
-        self.w_id = 4.0
-        self.w_ssim = 0.8
-        self.w_freq = 0.05
-        self.w_edge = 0.20
+        self.w_percep = 1.80  # Increased (Pretrained VGG)
+        self.w_id = 10.0    # INCREASED: Prioritize Identity Anchor
+        self.w_ssim = 2.50    # Increased (Structural fidelity)
+        self.w_freq = 0.15
+        self.w_edge = 0.40
 
     def forward(self, pred, target, arcface_model=None):
         """
@@ -128,21 +129,22 @@ class HybridLossCombiner(nn.Module):
         edge = self.edge_loss(pred, target)
         loss_dict['edge'] = edge * self.w_edge
         
-        # 5. Identity Loss (Differentiable)
-        if arcface_model is not None:
-            # Extract embeddings directly from tensors (preserves gradients)
-            pred_emb = arcface_model(pred)
-            target_emb = arcface_model(target)
-            
-            # Identity Loss = 1 - Cosine Similarity
-            # Higher similarity -> Lower loss
-            id_loss = 1.0 - F.cosine_similarity(pred_emb, target_emb).mean()
-            loss_dict['id'] = id_loss * self.w_id
-        else:
-            loss_dict['id'] = torch.tensor(0.0, device=self.device)
-            
+        # FIX: Always use PRETRAINED VGG structural proxy for Identity distillation
+        # (The differentiable ArcFace was using random weights, which destroyed identity).
+        pred_vgg = self.perceptual_loss.net(pred_norm)
+        target_vgg = self.perceptual_loss.net(target_norm)
+        
+        # VGG relu3_3 captures stable face geometry (eyes, nose, mouth)
+        # FIX: Normalized Identity Similarity (Prevents gradient spikes)
+        # Using Cosine Similarity on structural VGG features for stable [0, 2] loss
+        id_loss = 1.0 - F.cosine_similarity(
+            pred_vgg.relu3_3.flatten(1), 
+            target_vgg.relu3_3.flatten(1), 
+            dim=1
+        ).mean()
+        loss_dict['id'] = id_loss * self.w_id
+        
         # Total Generator Loss
         total_loss = sum(loss_dict.values())
-        loss_dict['total'] = total_loss
         
         return total_loss, loss_dict

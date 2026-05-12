@@ -27,53 +27,181 @@ class ArcFaceModel:
         self.app = FaceAnalysis(name=model_name, providers=[
             'CPUExecutionProvider' if device == 'cpu' else 'CUDAExecutionProvider'
         ])
-        self.app.prepare(ctx_id=0 if device == 'cuda' else -1, det_size=(128, 128))
+        # FIX: Production-standard detection size for high-res (512x512) images
+        self.app.prepare(ctx_id=0 if device == 'cuda' else -1, det_size=(640, 640))
+        self.last_face_count = 0
     
-    def extract_embedding(self, image):
-        """Extract 512-dim ArcFace embedding.
+    def extract_embedding_with_conf(self, image):
+        """Extract embedding and detection confidence.
         
         Args:
             image: Numpy array [H, W, 3] in RGB, range [0, 255]
-                   or torch tensor [3, H, W] in range [0, 1]
             
         Returns:
-            Embedding tensor [512] or None if no face detected
+            (Embedding tensor [512], Confidence float) or (None, 0.0)
         """
-        # Convert torch tensor to numpy if needed
-        if isinstance(image, torch.Tensor):
-            if image.dim() == 4:
-                image = image[0]  # Remove batch dimension
-            image = image.detach().permute(1, 2, 0).cpu().numpy() * 255
-            image = image.astype(np.uint8)
-        
         # Convert RGB to BGR for InsightFace
-        image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        img_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         
-        # Detect face and extract embedding
-        faces = self.app.get(image_bgr)
+        # TASK 9: Multi-pass face detection sequence
+        passes = []
         
+        # Pass 1: CLAHE Enhanced
+        lab = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        l = clahe.apply(l)
+        lab = cv2.merge((l, a, b))
+        passes.append(cv2.cvtColor(lab, cv2.COLOR_LAB2BGR))
+        
+        # Pass 2: Raw BGR (sometimes enhancement confuses the model)
+        passes.append(img_bgr)
+        
+        # Pass 3: Brightness Boost (alpha=1.5, beta=30)
+        passes.append(cv2.convertScaleAbs(img_bgr, alpha=1.5, beta=30))
+        
+        # Pass 4: Gamma Boost (Power law)
+        gamma = 0.5
+        invGamma = 1.0 / gamma
+        table = np.array([((i / 255.0) ** invGamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
+        passes.append(cv2.LUT(img_bgr, table))
+
+        faces = []
+        for i, det_img in enumerate(passes):
+            # Add padding to handle faces at edges
+            det_img_pad = cv2.copyMakeBorder(det_img, 30, 30, 30, 30, cv2.BORDER_CONSTANT, value=[0,0,0])
+            faces = self.app.get(det_img_pad)
+            if len(faces) > 0:
+                if i > 0: print(f"  [DETECTION] Pass {i} SUCCESS")
+                break
+        
+        self.last_face_count = len(faces)
         if len(faces) == 0:
-            return None
+            return None, 0.0
+
+        # TASK 10: Largest-face selection (prevent identity confusion)
+        if len(faces) > 1:
+            # Sort by area (bbox: x1, y1, x2, y2)
+            faces = sorted(faces, key=lambda f: (f.bbox[2]-f.bbox[0]) * (f.bbox[3]-f.bbox[1]), reverse=True)
+            print(f"  [DETECTION] Multiple faces found ({len(faces)}). Selecting largest.")
         
-        # Return embedding of first detected face
-        embedding = torch.from_numpy(faces[0].embedding).float()
-        return embedding
+        face = faces[0]
+        embedding = torch.from_numpy(face.embedding).float()
+        confidence = float(face.det_score)
+        
+        if torch.isnan(embedding).any() or torch.isinf(embedding).any():
+            return None, 0.0
+            
+        return embedding, confidence
+
+    def extract_embedding(self, image):
+        """Standard embedding extraction (backward compatibility)."""
+        emb, _ = self.extract_embedding_with_conf(image)
+        return emb
+
+    def get_face_info(self, image):
+        """Detect faces and return the largest face object (with landmarks)."""
+        img_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        
+        # Multi-pass detection sequence (Task 9)
+        passes = []
+        passes.append(img_bgr) # Pass 1: Raw
+        # Pass 2: CLAHE
+        lab = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        l = clahe.apply(l)
+        passes.append(cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2BGR))
+        
+        # Pass 3: Gamma
+        gamma = 0.5
+        table = np.array([((i / 255.0) ** (1.0/gamma)) * 255 for i in np.arange(0, 256)]).astype("uint8")
+        passes.append(cv2.LUT(img_bgr, table))
+
+        for i, det_img in enumerate(passes):
+            # Add padding for edge detection
+            pad = 30
+            det_img_pad = cv2.copyMakeBorder(det_img, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=[0,0,0])
+            faces = self.app.get(det_img_pad)
+            if len(faces) > 0:
+                # Correct coordinates for padding
+                for face in faces:
+                    face.bbox -= [pad, pad, pad, pad]
+                    face.kps -= [pad, pad]
+                
+                # Select largest face
+                if len(faces) > 1:
+                    faces = sorted(faces, key=lambda f: (f.bbox[2]-f.bbox[0]) * (f.bbox[3]-f.bbox[1]), reverse=True)
+                return faces[0]
+        return None
+
+    def extract_with_landmarks(self, image, landmarks):
+        """Extract embedding using fixed landmarks for alignment. Task 3."""
+        from insightface.utils import face_align
+        img_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        
+        # 1. Align using fixed landmarks
+        aligned = face_align.norm_crop(img_bgr, landmarks)
+        
+        # 2. Extract embedding using the recognition model
+        # We must provide a dummy face object to satisfy the wrapper
+        from insightface.app.common import Face
+        dummy_face = Face(kps=landmarks)
+        
+        net = self.app.models['recognition']
+        # The wrapper .get() usually handles the forward pass
+        # If it's the ArcFaceONNX wrapper, it takes (img, face)
+        embedding = net.get(img_bgr, dummy_face)
+        
+        return torch.from_numpy(embedding).float()
+
+    def cosine_similarity(self, emb1, emb2):
+        """Compute cosine similarity between two embeddings."""
+        if emb1 is None or emb2 is None: return 0.0
+        return float(F.cosine_similarity(emb1.unsqueeze(0), emb2.unsqueeze(0)).item())
+
+    def align_face(self, image):
+        """Return aligned face crop [112, 112] using largest detected face landmarks."""
+        img_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        # Add padding
+        img_pad = cv2.copyMakeBorder(img_bgr, 30, 30, 30, 30, cv2.BORDER_CONSTANT, value=[0,0,0])
+        faces = self.app.get(img_pad)
+        if len(faces) == 0: return None
+        
+        # Largest face
+        if len(faces) > 1:
+            faces = sorted(faces, key=lambda f: (f.bbox[2]-f.bbox[0]) * (f.bbox[3]-f.bbox[1]), reverse=True)
+        
+        face = faces[0]
+        # InsightFace handles alignment internally if we use face.norm_face
+        # but here we just return the face object for external landmark transfer
+        return face
+
     
-    def extract_embeddings_batch(self, images):
-        """Extract embeddings for batch of images.
+    def extract_batch(self, images_t):
+        """Extract embeddings for a batch of images (Tensors).
         
         Args:
-            images: Batch of images [B, 3, H, W]
+            images_t: [B, 3, H, W] Tensor in [0, 1] RGB
             
         Returns:
-            Embeddings [B, 512] or None for images without faces
+            [B, 512] Tensor of embeddings
         """
-        embeddings = []
-        for i in range(images.shape[0]):
-            emb = self.extract_embedding(images[i])
-            embeddings.append(emb)
+        embs = []
+        for i in range(images_t.shape[0]):
+            # Convert to [0, 255] RGB numpy
+            img_np = (images_t[i].permute(1, 2, 0).detach().cpu().numpy() * 255.0).astype(np.uint8)
+            emb = self.extract_embedding(img_np)
+            if emb is None:
+                embs.append(torch.zeros(512, device=images_t.device))
+            else:
+                embs.append(emb.to(images_t.device))
         
-        return embeddings
+        return torch.stack(embs)
+
+    def extract_embeddings_batch(self, images):
+        """Legacy alias."""
+        return self.extract_batch(images)
     
     @staticmethod
     def cosine_similarity(emb1, emb2):
@@ -152,11 +280,24 @@ class DifferentiableArcFace(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        # Input expected in range [0, 1] and size [112, 112]
+        # Input expected in range [0, 1]
+        
+        # TASK 7: EXACT PREPROCESSING MATCHING TRAINING
+        # 1. Batch dimension correct
+        if x.dim() == 3:
+            x = x.unsqueeze(0)
+            
+        # 2. Resize 112x112
         if x.shape[2] != 112 or x.shape[3] != 112:
             x = F.interpolate(x, size=(112, 112), mode='bilinear', align_corners=True)
+            
+        # 3. BGR->RGB
+        # Assuming input is BGR from OpenCV, convert to RGB by channel flipping
+        x = x[:, [2, 1, 0], :, :]
         
-        x = (x - 0.5) / 0.5 # Normalise to [-1, 1]
+        # 4. Normalize to [-1, 1]
+        x = (x - 0.5) / 0.5
+        
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.prelu(x)

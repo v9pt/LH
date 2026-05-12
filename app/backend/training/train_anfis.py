@@ -56,23 +56,26 @@ if DATA_DIR.exists() and len(list(DATA_DIR.glob('*.jpg'))) > 100:
 else:
     # Fallback: pure synthetic data (no real images needed)
     print("  ⚠  CelebA not found — using fully synthetic training data.")
+    # TASK 10: Scientific Synthetic Distribution (Oversample Dark Cases)
     rng = np.random.default_rng(42)
     N   = TRAIN_N
-    gammas  = rng.uniform(1.0, 5.0, N).astype(np.float32)
+    # Skew distribution towards higher gamma (darker)
+    gammas  = rng.power(2.0, N).astype(np.float32) * 4.0 + 1.0 
     targets = ((gammas - 1.0) / 4.0).reshape(-1, 1)
+    
+    # 5-D Feature Subset (Synchronized with inference.py)
+    # Features: Mean, Std, Entropy, Gradient, FFT
     X = np.stack([
-        np.clip(1.0 - gammas/5 + rng.normal(0, 0.05, N), 0, 1),      # mean lum
-        np.clip(0.3 - gammas/20 + rng.normal(0, 0.02, N), 0, 1),     # std lum
-        np.clip(gammas/5 + rng.normal(0, 0.05, N), 0, 1),           # DCP
-        np.clip(1.0 - gammas/8 + rng.normal(0, 0.05, N), 0, 1),     # entropy
-        np.clip(0.4 - gammas/10 + rng.normal(0, 0.05, N), 0, 1),     # local RMS
-        np.clip(0.2 - gammas/20 + rng.normal(0, 0.05, N), 0, 1),     # edge density
-        np.clip(gammas/10 + rng.normal(0, 0.05, N), 0, 1),          # noise est
-        np.clip(gammas/6 + rng.normal(0, 0.05, N), 0, 1),           # contrast
-        np.clip(0.5 - gammas/15 + rng.normal(0, 0.05, N), 0, 1),     # hist spread
-        np.clip(0.5 - gammas/20 + rng.normal(0, 0.05, N), 0, 1),     # saturation
+        np.clip(1.0 - targets.flatten() + rng.normal(0, 0.05, N), 0, 1),      # mean lum
+        np.clip(0.4 - 0.2*targets.flatten() + rng.normal(0, 0.02, N), 0, 1), # std lum
+        np.clip(1.0 - 0.5*targets.flatten() + rng.normal(0, 0.05, N), 0, 1), # entropy
+        np.clip(0.3 - 0.2*targets.flatten() + rng.normal(0, 0.05, N), 0, 1), # gradient/edge
+        np.clip(0.1 + 0.7*targets.flatten() + rng.normal(0, 0.05, N), 0, 1),  # FFT blur
     ], axis=1).astype(np.float32)
-    history = de.train_from_arrays(X, targets, epochs=ANFIS_EPOCHS, verbose=True)
+    
+    # Lower LR and longer training for convergence
+    de = DarknessEstimator(n_mfs=3, lr=5e-4, device=DEVICE)
+    history = de.train_from_arrays(X, targets, epochs=ANFIS_EPOCHS * 2, verbose=True)
 
 de.save(CKPT_DIR / 'darkness_estimator.pt')
 print(f"  ✓ Done in {time.time()-t0:.1f}s  |  Final MSE: {history[-1]:.6f}")

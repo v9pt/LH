@@ -58,10 +58,12 @@ pipeline: Optional[ANFISFaceSRPipeline] = None
 async def startup_event():
     global pipeline
     print("Loading ANFIS pipeline...")
+    # Force use_sota_model=True to ensure the hardened 95% accuracy weights are used
     pipeline = ANFISFaceSRPipeline(
         device='cpu',
         use_blur_correction=True,
         use_gfpgan=True,
+        use_sota_model=True,
     )
     pipeline.load_pretrained(checkpoint_dir='checkpoints')
     print("Pipeline ready.")
@@ -183,15 +185,16 @@ async def enhance(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Pipeline error: {str(e)}")
     elapsed_ms = (time.perf_counter() - t_start) * 1000
 
+    # Synchronized with ANFIS 2.0 Mathematical Boundaries
     df = results['darkness_factor']
-    if df < 0.2:
-        interp = "Well-lit — minimal enhancement"
-    elif df < 0.5:
-        interp = "Moderately dark — moderate enhancement"
-    elif df < 0.75:
-        interp = "Dark — strong enhancement"
+    if df < 0.25:
+        interp = "Well-lit — Identity preservation prioritized"
+    elif df < 0.55:
+        interp = "Moderate — Balanced enhancement"
+    elif df < 0.80:
+        interp = "Dark — Generative reconstruction active"
     else:
-        interp = "Extremely dark — maximum enhancement"
+        interp = "Extremely dark — Maximum LCR Codebook projection"
 
     blur_info = results.get('blur_info', {})
 

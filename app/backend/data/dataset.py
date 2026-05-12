@@ -7,8 +7,13 @@ from torch.utils.data import Dataset
 
 try:
     from app.backend.core.darkness_estimator import extract_illumination_features
+    from app.backend.utils.debug_utils import get_logger
 except ImportError:
     from core.darkness_estimator import extract_illumination_features
+    try:
+        from utils.debug_utils import get_logger
+    except ImportError:
+        get_logger = None
 
 
 class FaceSRDataset(Dataset):
@@ -22,9 +27,13 @@ class FaceSRDataset(Dataset):
         for data_dir in data_dirs:
             root = Path(data_dir)
             if root.exists():
-                paths.extend(sorted(root.glob("*.jpg")))
-                paths.extend(sorted(root.glob("*.jpeg")))
-                paths.extend(sorted(root.glob("*.png")))
+                # Optimized fast-scan for large datasets
+                img_gen = root.iterdir()
+                for p in img_gen:
+                    if p.suffix.lower() in ['.jpg', '.jpeg', '.png']:
+                        paths.append(p)
+                    if max_images and len(paths) >= max_images:
+                        break
         if max_images is not None:
             paths = paths[:max_images]
         self.paths = paths
@@ -36,6 +45,11 @@ class FaceSRDataset(Dataset):
         path = self.paths[index]
         bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if bgr is None:
+            if get_logger is not None:
+                try:
+                    get_logger().log_failure(path.name, "dataset_read", f"Could not read image: {path}")
+                except Exception:
+                    pass
             raise RuntimeError(f"Could not read image: {path}")
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
         rgb = cv2.resize(rgb, (self.hr_size, self.hr_size), interpolation=cv2.INTER_AREA)

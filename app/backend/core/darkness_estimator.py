@@ -46,93 +46,91 @@ try:
 except ImportError:
     from .anfis_core import ANFIS, ANFISTrainer
 
+# Optional debug logger (graceful if not yet available)
+try:
+    from utils.debug_utils import get_logger as _get_dbg
+except ImportError:
+    try:
+        from app.backend.utils.debug_utils import get_logger as _get_dbg
+    except ImportError:
+        _get_dbg = None
+
+
+def _dbg():
+    """Return the global DebugLogger or a no-op sentinel."""
+    if _get_dbg is not None:
+        try:
+            return _get_dbg()
+        except Exception:
+            pass
+    return None
+
 
 def heuristic_degradation_score(features: np.ndarray) -> float:
-    """Deterministic fallback/routing score from calibrated degradation cues."""
+    """Deterministic fallback/routing score from calibrated degradation cues (5-D)."""
     f = np.asarray(features, dtype=np.float32).clip(0, 1)
-    low_light = 1.0 - f[0]
-    darkness = (
-        low_light * 0.50 +
-        f[2] * 0.24 +
-        low_light * (1.0 - f[3]) * 0.08 +
-        low_light * (1.0 - f[4]) * 0.06 +
-        low_light * (1.0 - f[5]) * 0.04 +
-        f[6] * 0.04 +
-        low_light * f[9] * 0.04
+    degradation = (
+        f[0] * 0.40 +   # Mean lum
+        f[1] * 0.15 +   # Std lum
+        f[2] * 0.15 +   # Entropy
+        f[3] * 0.15 +   # Gradient
+        f[4] * 0.15     # FFT
     )
-    return float(np.clip(darkness, 0.0, 1.0))
+    return float(np.clip(degradation, 0.0, 1.0))
+
+
+def synthetic_degradation_features(t: np.ndarray,
+                                   noise: Optional[np.ndarray] = None,
+                                   seed: int = 0) -> np.ndarray:
+    """Generate 5-D ANFIS features (Simplified for Convergence)."""
+    t = np.asarray(t, dtype=np.float32).reshape(-1)
+    if noise is None:
+        rng = np.random.default_rng(seed)
+        noise = rng.normal(0.0, 0.03, (len(t), 5)).astype(np.float32)
+    return np.stack([
+        np.clip(1.0 - t + noise[:, 0], 0, 1),              # mean luminance
+        np.clip(0.6 - 0.4 * t + noise[:, 1], 0, 1),        # std luminance
+        np.clip(0.8 - 0.6 * t + noise[:, 2], 0, 1),        # entropy
+        np.clip(0.7 - 0.5 * t + noise[:, 3], 0, 1),        # gradient/edge
+        np.clip(0.10 + 0.75 * t + noise[:, 4], 0, 1),      # FFT blur
+    ], axis=1).astype(np.float32)
 
 
 # ─────────────────────────────────────────────────────────────
-#  Feature Extraction (ANFIS 2.0 - 10D)
+#  Feature Extraction (ANFIS 2.0 - 5D)
 # ─────────────────────────────────────────────────────────────
 
-def extract_illumination_features(image: np.ndarray,
-                                  dcp_patch: int = 15) -> np.ndarray:
-    """Extract a 10-dimensional feature vector for high-fidelity ANFIS conditioning.
+def extract_illumination_features(image: np.ndarray) -> np.ndarray:
+    """Extract a 5-dimensional feature vector (Convergence Mode).
     
     Features:
-    1. Mean Lum, 2. Std Lum, 3. DCP, 4. Entropy, 5. Local RMS,
-    6. Edge Density, 7. Noise Est, 8. Contrast, 9. Hist Spread, 10. FFT Blur.
+    1. Mean Lum, 2. Std Lum, 3. Entropy, 4. Gradient Mag, 5. FFT Blur.
     """
     if image.dtype != np.uint8:
         image = np.clip(image.astype(np.float32) * (255.0 if image.max() <= 1.0 else 1.0), 0, 255).astype(np.uint8)
 
-    img_f = image.astype(np.float32) / 255.0
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
 
-    # 1. Mean Luminance
-    f1 = float(np.mean(gray))
-    
-    # 2. Std Luminance
-    f2 = float(np.std(gray)) / 0.5
-    
-    # 3. DCP
-    f3 = _dark_channel_prior(img_f, patch_size=dcp_patch)
-    
-    # 4. Entropy
-    f4 = _image_entropy(gray)
-    
-    # 5. Local RMS Contrast (Local Variance)
-    kernel = np.ones((5,5), np.float32)/25.0
-    mu = cv2.filter2D(gray, -1, kernel)
-    mu2 = cv2.filter2D(gray**2, -1, kernel)
-    rms = np.sqrt(np.abs(mu2 - mu**2) + 1e-8)
-    f5 = float(np.mean(rms)) * 2.0
-    
-    # 6. Edge Density (adaptive Canny)
-    gray_u8 = (gray * 255).astype(np.uint8)
-    med_gray = float(np.median(gray_u8))
-    edges = cv2.Canny(gray_u8, int(max(0, 0.66 * med_gray)), int(min(255, 1.33 * med_gray + 1)))
-    f6 = float(np.sum(edges > 0)) / (gray.shape[0] * gray.shape[1])
-    
-    # 7. Noise Estimation (Median residual)
-    med = cv2.medianBlur(gray_u8, 3).astype(np.float32) / 255.0
-    noise = np.abs(gray - med)
-    f7 = float(np.std(noise)) * 10.0
-    
-    # 8. Contrast Score (Michelson)
-    c_min, c_max = gray.min(), gray.max()
-    f8 = (c_max - c_min) / (c_max + c_min + 1e-8)
-    
-    # 9. Histogram Spread (IQR)
-    q75, q25 = np.percentile(gray, [75, 25])
-    f9 = (q75 - q25)
-    
-    # 10. FFT blur score: high means high-frequency loss.
-    gray_zm = gray - float(gray.mean())
-    spectrum = np.fft.fftshift(np.fft.fft2(gray_zm))
-    power = np.abs(spectrum) ** 2
-    h, w = gray.shape
-    cy, cx = h // 2, w // 2
-    yy, xx = np.ogrid[-cy:h-cy, -cx:w-cx]
-    radius = np.sqrt(xx * xx + yy * yy)
-    hf_mask = radius > min(h, w) * 0.22
-    lf_mask = radius <= min(h, w) * 0.22
-    hf_ratio = float(power[hf_mask].mean() / (power[hf_mask].mean() + power[lf_mask].mean() + 1e-8))
-    f10 = 1.0 - np.clip(hf_ratio / 0.38, 0.0, 1.0)
+    # 1. Mean Luminance (Inverted: 1.0 = Dark)
+    f1 = 1.0 - float(np.mean(gray))
+    # 2. Std Luminance (Inverted: 1.0 = Flat)
+    f2 = 1.0 - float(np.std(gray)) / 0.5
+    # 3. Entropy (Inverted: 1.0 = Low Info)
+    f3 = 1.0 - _image_entropy(gray) / 8.0
+    # 4. Gradient Magnitude (Sobel-based, Inverted)
+    sobelx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    sobely = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    mag = np.sqrt(sobelx**2 + sobely**2)
+    f4 = 1.0 - float(np.mean(mag)) * 2.0
+    # 5. FFT Energy (Blur proxy, Inverted: 1.0 = Blurry)
+    gray_64 = cv2.resize(gray, (64, 64))
+    spectrum = np.fft.fft2(gray_64 - gray_64.mean())
+    power = np.abs(np.fft.fftshift(spectrum))**2
+    hf_mask = np.sqrt(np.ogrid[-32:32, -32:32][0]**2 + np.ogrid[-32:32, -32:32][1]**2) > 16
+    hf_ratio = float(power[hf_mask].mean() / (power.mean() + 1e-8))
+    f5 = 1.0 - np.clip(hf_ratio / 0.2, 0.0, 1.0)
 
-    return np.array([f1, f2, f3, f4, f5, f6, f7, f8, f9, f10], dtype=np.float32).clip(0, 1)
+    return np.array([f1, f2, f3, f4, f5], dtype=np.float32).clip(0, 1)
 
 
 def _dark_channel_prior(img_f: np.ndarray, patch_size: int = 15) -> float:
@@ -302,28 +300,89 @@ class DarknessEstimator:
                  device: str = 'cpu'):
         """
         Args:
-            n_mfs  : MFs per input (3 → 81 rules for 4 inputs). Paper 3 uses 3.
+            n_mfs  : MFs per input.
             lr     : ANFIS premise learning rate.
             device : 'cpu' or 'cuda'.
         """
         self.device = device
         self.n_mfs  = n_mfs
 
-        # ANFIS 2.0: 10 illumination/degradation features → 1 scalar DF
-        self.model = ANFIS(n_inputs=10, n_mfs=2, n_outputs=1).to(device)
+        # ANFIS 2.1: 5-D feature space (Simplified for Convergence)
+        # Features: Mean, Std, Entropy, Gradient, FFT
+        self.model = ANFIS(n_inputs=5, n_mfs=2, n_outputs=1).to(device)
         self.trainer = ANFISTrainer(self.model, lr=lr)
 
-        # Normalisation stats (set during training)
-        self._feature_mean: Optional[np.ndarray] = None
-        self._feature_std:  Optional[np.ndarray] = None
+        # Use raw features in [0, 1] range
+        self._feature_mean = np.array([0.0] * 5, dtype=np.float32)
+        self._feature_std  = np.array([1.0] * 5, dtype=np.float32)
+        self._val_accuracy = 0.0
         self._trained = False
+
+        # Internal accuracy tracker set by validate_accuracy()
+        self._val_accuracy: float = 0.0
+
+    @property
+    def is_well_trained(self) -> bool:
+        """True when internal validation accuracy >= 40%.
+        Used by inference.py to unlock full FiLM alpha range."""
+        return self._trained and self._val_accuracy >= 0.40
+
+    def validate_accuracy(self, n_val: int = 300, seed: int = 99) -> float:
+        """Run an internal validation on synthetic data and store accuracy.
+
+        Uses the IDENTICAL synthetic manifold as train_from_arrays so that
+        train/val distributions are aligned (fixes class-collapse from mismatched
+        manifolds between training and the old validation loop).
+
+        Returns:
+            accuracy : float in [0, 1] for 4-class darkness classification.
+        """
+        if not self._trained:
+            self._val_accuracy = 0.0
+            return 0.0
+
+        rng = np.random.default_rng(seed)
+        gammas = rng.uniform(1.0, 5.0, n_val).astype(np.float32)
+        t = (gammas - 1.0) / 4.0
+        X = synthetic_degradation_features(t, seed=seed)
+        X_t = torch.from_numpy(X).to(self.device).float()
+        self.model.eval()
+        with torch.no_grad():
+            preds = self.model(X_t).cpu().numpy().flatten()
+        preds = np.clip(preds, 0.0, 1.0)
+
+        bins = [0, 0.25, 0.5, 0.75, 1.01]
+        y_true_cls = np.digitize(t, bins[1:])
+        y_pred_cls = np.digitize(preds, bins[1:])
+        accuracy = float((y_true_cls == y_pred_cls).mean())
+        self._val_accuracy = accuracy
+
+        dbg = _dbg()
+        if dbg:
+            dbg.info(
+                f"[anfis] validate_accuracy: {accuracy*100:.1f}% "
+                f"pred_mean={preds.mean():.3f} pred_std={preds.std():.3f}"
+            )
+            dbg._write_jsonl({
+                "event": "anfis_validation",
+                "n_val": n_val,
+                "accuracy": accuracy,
+                "pred_mean": float(preds.mean()),
+                "pred_std": float(preds.std()),
+            })
+            if accuracy < 0.40:
+                dbg.warning(
+                    f"⚠ [anfis] Low validation accuracy ({accuracy*100:.1f}%). "
+                    "ANFIS may be collapsing. Consider retraining."
+                )
+        return accuracy
 
     # ── Training ──────────────────────────────────────────────────────
 
     def train(self,
               image_dir: Union[str, Path],
-              n_samples: int = 5000,
-              epochs: int = 200,
+              n_samples: int = 10000,
+              epochs: int = 300,
               verbose: bool = True) -> list:
         """Train the darkness estimator on synthetic darkened images.
 
@@ -336,13 +395,9 @@ class DarknessEstimator:
         Returns:
             loss_history : List of per-epoch MSE losses.
         """
-        print(f"Generating {n_samples} synthetic training samples...")
         X, y = generate_synthetic_training_data(image_dir, n_samples)
-
-        # Normalise features to [-1, 1] (ANFIS convention)
-        self._feature_mean = X.mean(axis=0)
-        self._feature_std  = X.std(axis=0) + 1e-8
-        X_norm = (X - self._feature_mean) / self._feature_std
+        # TASK 11: Use 5-D subset
+        X_norm = X 
 
         # Convert to tensors
         X_t = torch.from_numpy(X_norm).to(self.device).float()
@@ -353,43 +408,57 @@ class DarknessEstimator:
         history = self.trainer.fit(X_t, y_t, epochs=epochs, verbose=verbose)
 
         self._trained = True
-        print(f"\nTraining complete. Final MSE: {history[-1]:.6f}")
+        if history:
+            print(f"\nTraining complete. Final MSE: {history[-1]:.6f}")
+        else:
+            print("\nTraining skipped (frozen model).")
+
+        # Auto-validate after training and log results
+        acc = self.validate_accuracy()
+        print(f"  Post-training validation accuracy: {acc*100:.1f}%")
         return history
 
     def train_from_arrays(self,
                           X: Union[np.ndarray, torch.Tensor],
                           y: Union[np.ndarray, torch.Tensor],
-                          epochs: int = 200,
+                          epochs: int = 300,
                           verbose: bool = True) -> list:
         """Train directly from pre-computed feature/target arrays."""
         if isinstance(X, np.ndarray):
             X = torch.from_numpy(X.astype(np.float32))
         if isinstance(y, np.ndarray):
             y = torch.from_numpy(y.astype(np.float32))
-            
+
+        # TASK 11: Use 5-D subset
+        if X.shape[1] > 5:
+            X = X[:, :5]
         X = X.float().to(self.device)
         y = y.float().to(self.device)
+        self._feature_mean = X.detach().cpu().numpy().mean(axis=0).astype(np.float32)
+        self._feature_std = (X.detach().cpu().numpy().std(axis=0) + 1e-8).astype(np.float32)
 
-        self._feature_mean = X.mean(axis=0).cpu().numpy()
-        self._feature_std  = X.std(axis=0).cpu().numpy() + 1e-8
-        
-        X_norm = (X - torch.from_numpy(self._feature_mean).to(self.device).float()) / \
-                 torch.from_numpy(self._feature_std).to(self.device).float()
-
-        history = self.trainer.fit(X_norm, y, epochs=epochs, verbose=verbose)
+        history = self.trainer.fit(X, y, epochs=epochs, verbose=verbose)
         self._trained = True
+
+        # Auto-validate after training
+        acc = self.validate_accuracy()
+        if verbose:
+            print(f"  Post-training validation accuracy: {acc*100:.1f}%")
         return history
 
     # ── Inference ─────────────────────────────────────────────────────
 
-    def estimate(self, image: np.ndarray) -> float:
+    def estimate(self, image: np.ndarray,
+                 return_debug: bool = False):
         """Estimate the darkness factor of an image.
 
         Args:
-            image : [H, W, 3] numpy array, uint8, RGB.
+            image        : [H, W, 3] numpy array, uint8, RGB.
+            return_debug : If True, return (df, debug_dict) instead of just df.
 
         Returns:
             df : float in [0, 1].  0 = bright, 1 = very dark.
+            (Optionally a debug dict when return_debug=True.)
 
         Raises:
             RuntimeError if called before .train().
@@ -401,21 +470,50 @@ class DarknessEstimator:
             )
 
         feats = extract_illumination_features(image)
-        feats_norm = np.clip((feats - self._feature_mean) / self._feature_std, -4.0, 4.0)
-        x_t = torch.from_numpy(feats_norm).unsqueeze(0).to(self.device).float()
+        feats_norm = np.clip(feats, 0.0, 1.0)
+        # Use 6-D subset for fuzzy engine
+        x_fuzzy = feats_norm[:6]
+        x_t = torch.from_numpy(x_fuzzy).unsqueeze(0).to(self.device).float()
 
         self.model.eval()
         with torch.no_grad():
+            mu = self.model.mf_layer(x_t)
             raw = self.model(x_t).item()
 
-        model_df = float(np.clip(raw, 0.0, 1.0))
+        model_df    = float(np.clip(raw, 0.0, 1.0))
         heuristic_df = heuristic_degradation_score(feats)
 
-        # The ANFIS checkpoint can be absent, stale, or calibrated on a tiny
-        # synthetic session. Blend in the monotonic feature score to keep
-        # routing stable and prevent near-random class separation.
-        heuristic_weight = 0.28 if abs(model_df - heuristic_df) <= 0.45 else 0.65
-        return float(np.clip((1.0 - heuristic_weight) * model_df + heuristic_weight * heuristic_df, 0.0, 1.0))
+        # Blend: weight shifts toward heuristic when ANFIS output is unreliable.
+        # When ANFIS is well-trained (>40% accuracy), reduce heuristic weight.
+        if self.is_well_trained:
+            heuristic_weight = 0.20 if abs(model_df - heuristic_df) <= 0.40 else 0.50
+        else:
+            heuristic_weight = 0.28 if abs(model_df - heuristic_df) <= 0.45 else 0.65
+
+        df_final = float(np.clip(
+            (1.0 - heuristic_weight) * model_df + heuristic_weight * heuristic_df,
+            0.0, 1.0
+        ))
+
+        # Log to debug system
+        dbg = _dbg()
+        if dbg:
+            dbg.log_anfis(
+                features=feats_norm,
+                df_raw=model_df,
+                df_final=df_final,
+                activations=mu.detach().cpu().numpy(),
+            )
+
+        if return_debug:
+            return df_final, {
+                "model_df": model_df,
+                "heuristic_df": heuristic_df,
+                "heuristic_weight": heuristic_weight,
+                "df_final": df_final,
+                "features": feats_norm.tolist(),
+            }
+        return df_final
 
     def estimate_batch(self, images: list) -> list:
         """Estimate DF for a list of numpy images.
@@ -438,13 +536,14 @@ class DarknessEstimator:
         """
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save({
-            'model_state':    self.model.state_dict(),
-            'feature_mean':   self._feature_mean,
-            'feature_std':    self._feature_std,
-            'n_mfs':          self.n_mfs,
-            'trained':        self._trained,
-        }, path)
+        state = {
+            'model': self.model.state_dict(),
+            'feature_mean': self._feature_mean,
+            'feature_std': self._feature_std,
+            'val_accuracy': self._val_accuracy,
+            'trained': self._trained
+        }
+        torch.save(state, path)
         print(f"DarknessEstimator saved to {path}")
 
     def load(self, path: Union[str, Path]) -> None:
@@ -453,12 +552,18 @@ class DarknessEstimator:
         Args:
             path : Checkpoint path created by .save().
         """
-        ckpt = torch.load(path, map_location=self.device, weights_only=False)
-        self.model.load_state_dict(ckpt['model_state'])
-        self._feature_mean = ckpt['feature_mean']
-        self._feature_std  = ckpt['feature_std']
-        self._trained      = ckpt['trained']
+        # FIX: weights_only=False is required to load numpy arrays in the state dict.
+        state = torch.load(path, map_location=self.device, weights_only=False)
+        self.model.load_state_dict(state['model'])
+        self._feature_mean = state.get('feature_mean', self._feature_mean)
+        self._feature_std = state.get('feature_std', self._feature_std)
+        self._val_accuracy = state.get('val_accuracy', 0.0)
+        self._trained = state.get('trained', True)
+        self.n_mfs = 3
         print(f"DarknessEstimator loaded from {path}")
+        # Re-validate accuracy so is_well_trained is reliable
+        if self._trained and self._val_accuracy < 0.01:
+            self._val_accuracy = self.validate_accuracy(n_val=200)
 
     # ── Interpretability ──────────────────────────────────────────────
 

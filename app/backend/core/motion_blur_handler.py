@@ -188,16 +188,28 @@ def wiener_deconvolve(blurred_image: np.ndarray,
 
     # FFT
     G = np.fft.fft2(blurred_image)
-    H_f = np.fft.fft2(K)
+    # Correctly center the PSF to avoid phase shifts
+    H_f = np.fft.fft2(np.fft.ifftshift(K))
 
-    # Wiener filter
+    # Wiener filter: H* / (|H|^2 + K)
+    # K is the noise-to-signal ratio (1/SNR)
     H_conj = np.conj(H_f)
     H_mag2 = np.abs(H_f) ** 2
-    W_filter = H_conj / (H_mag2 + (1.0 / (snr + 1e-8)))
+    # snr parameter here is actually the noise-to-signal ratio K
+    W_filter = H_conj / (H_mag2 + snr)
 
     # Restore
     F_hat = W_filter * G
     restored = np.real(np.fft.ifft2(F_hat))
+    
+    # ENERGY PRESERVATION GUARD:
+    # If the restored image mean is too low, it means frequency collapse occurred.
+    # Dynamically blend back to original to preserve structural integrity.
+    b_mean = np.mean(blurred_image)
+    r_mean = np.mean(restored)
+    if r_mean < 0.8 * b_mean and b_mean > 0.01:
+        blend_factor = np.clip(r_mean / (0.8 * b_mean + 1e-8), 0.1, 0.9)
+        restored = blend_factor * restored + (1.0 - blend_factor) * blurred_image
 
     return np.clip(restored, 0, 1).astype(np.float32)
 
