@@ -1,0 +1,48 @@
+\chapter{SYSTEM DESIGN AND PRACTICAL IMPLEMENTATION}
+
+\section{System Overview and Architectural Rationale}
+A high-performance facial restoration system for forensic applications must balance computational complexity with modular flexibility. Our implementation, termed the ANFIS-LLFSR pipeline, is designed as a multi-tier architecture that separates data ingestion, fuzzy-guided restoration, and identity verification.
+
+\section{Software Architecture and Modular Organization}
+The project backend is organized as a modular Python package, ensuring that individual components can be unit-tested and optimized independently.
+
+\subsection{Core Logic Modules}
+The \texttt{app/backend/core/} directory contains the fundamental implementation of the hybrid logic:
+\begin{itemize}
+    \item \textbf{\texttt{anfis\_core.py}:} Implements the 5-layer ANFIS architecture. It handles the forward pass for illumination estimation and the hybrid RLS-GD learning logic for parameter optimization.
+    \item \textbf{\texttt{anfis\_lcr.py}:} Manages the patch-based hallucination process. It includes the locality-constrained dictionary search and the coefficient reweighting logic guided by the ANFIS Darkness Factor ($DF$).
+    \item \textbf{\texttt{darkness\_estimator.py}:} Responsible for the statistical feature extraction (e.g., Mean Intensity, Local Contrast, Dark Pixel Ratio) that forms the input vector for the ANFIS module.
+\end{itemize}
+
+\subsection{Neural Refinement Models}
+The \texttt{app/backend/models/} directory houses the deep learning components:
+\begin{itemize}
+    \item \textbf{\texttt{swin\_fuzzy\_lcr.py}:} The primary refinement network. It integrates the Swin Transformer blocks with the Spatial Feature Transform (SFT) layers, allowing for condition-aware feature modulation.
+    \item \textbf{\texttt{wavelet\_fusion.py}:} Implements the multi-resolution decomposition logic, enabling the model to separate and refine high-frequency textural details from low-frequency illumination signals.
+\end{itemize}
+
+\section{Software Design Patterns}
+The system utilizes the \textbf{Modular Factory} design pattern. Each restoration stage (ANFIS, LCR, Swin) is implemented as a standalone class with a standardized interface. This "pluggable" design is critical for research and deployment; it allows us to swap in different transformer backbones or dictionary sets without modifying the core inference loop. This modularity ensures that the system is resilient to future technological shifts in any specific sub-module.
+
+\section{Hardware Topology and Parallelization}
+The ANFIS-LLFSR system is designed to leverage high-performance GPU resources for parallelized inference.
+
+\subsection{Workstation Configuration}
+The experiments and inference benchmarks were conducted on a dual-GPU workstation:
+\begin{itemize}
+    \item \textbf{GPU:} 2x NVIDIA GeForce RTX 3090 (24GB VRAM each) connected via NVLink.
+    \item \textbf{CPU:} AMD Ryzen 9 5950X (16 Cores, 32 Threads).
+    \item \textbf{RAM:} 128GB DDR4 3600MHz.
+\end{itemize}
+
+\subsection{Heterogeneous Parallelism}
+To achieve near-real-time performance, we utilize a "Heterogeneous Parallelism" approach. The memory-intensive LCR dictionary atoms are stored in GPU 0, while the compute-intensive Swin Transformer attention maps are processed in GPU 1. By utilizing CUDA streams, we overlap the dictionary search (Algorithm \ref{alg:lcr}) with the neural feature modulation (Algorithm \ref{alg:sft}), resulting in a 22\% reduction in total inference latency compared to a single-GPU serial implementation.
+
+\section{Deployment Interface: The Real-Time Dashboard}
+To facilitate the practical utility of the model for forensic analysts, we developed a real-time dashboard using FastAPI (backend) and React (frontend).
+
+\subsection{Asynchronous Inference Pipeline}
+The dashboard utilizes a producer-consumer architecture. Incoming image streams from surveillance feeds are queued and processed asynchronously. The ANFIS module provides a live "Darkness Heatmap," alerting the operator when a frame requires heavy structural hallucination due to severe photon starvation.
+
+\subsection{Identity Verification Sentinel}
+The dashboard integrates a persistent embedding cache. Every restored face is automatically compared against a local database using the ArcFace sentinel. If the similarity score exceeds a predefined threshold (e.g., 0.70), the system flags the identity as a "Forensic Match," providing a confidence score alongside the restored high-resolution image.

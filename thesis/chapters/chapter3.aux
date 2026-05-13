@@ -1,0 +1,139 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}RESULTS AND DISCUSSION}{28}{chapter.3}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}Experimental Setup}{28}{section.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1.1}Hardware and Software Environment}{28}{subsection.3.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1.2}Training Protocol}{28}{subsection.3.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}Dataset Characterization and Statistical Profile}{28}{section.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.1}CelebA-HQ Statistical Distribution}{28}{subsection.3.2.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.1}{\ignorespaces Statistical distribution of attributes in the CelebA-HQ test set, showcasing a diverse mix of gender, age, and initial illumination conditions.}}{28}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:dataset_dist}{{3.1}{28}{Statistical distribution of attributes in the CelebA-HQ test set, showcasing a diverse mix of gender, age, and initial illumination conditions}{figure.caption.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2}{\ignorespaces Radar chart comparing ANFIS-LLFSR against GFPGAN and CodeFormer across four dimensions: Fidelity (PSNR), Structure (SSIM), Realism (LPIPS), and Identity (ArcFace Sim).}}{29}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:radar_metrics}{{3.2}{29}{Radar chart comparing ANFIS-LLFSR against GFPGAN and CodeFormer across four dimensions: Fidelity (PSNR), Structure (SSIM), Realism (LPIPS), and Identity (ArcFace Sim)}{figure.caption.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.2}Degradation Taxonomy}{29}{subsection.3.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}Static Baseline Performance Analysis}{29}{section.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.1}Impact of Fixed Illumination Enhancement}{29}{subsection.3.3.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.1}{\ignorespaces Performance of static enhancement vs. proposed adaptive system.}}{29}{table.caption.13}\protected@file@percent }
+\newlabel{tab:static_baseline}{{3.1}{29}{Performance of static enhancement vs. proposed adaptive system}{table.caption.13}{}}
+\citation{li2020zero}
+\citation{wang2021towards}
+\citation{zhou2022codeformer}
+\@writefile{toc}{\contentsline {section}{\numberline {3.4}Benchmarking against Generative State-of-the-Art}{30}{section.3.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.2}{\ignorespaces Quantitative comparison on the CelebA test set under compound low-light and blur degradation.}}{30}{table.caption.14}\protected@file@percent }
+\newlabel{tab:quantitative}{{3.2}{30}{Quantitative comparison on the CelebA test set under compound low-light and blur degradation}{table.caption.14}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.5}Quantitative Synthesis and Identity-Fidelity Tradeoffs}{30}{section.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.6}Qualitative Forensic Evidence and Visual Audit}{31}{section.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.1}Visual Reconstruction Performance}{31}{subsection.3.6.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.3}{\ignorespaces Visual comparison of face restoration on a severe L3 sample. Our method (e) preserves the specific eye shape and lip texture better than generative models (c, d) which tend to "average out" the identity.}}{31}{figure.caption.15}\protected@file@percent }
+\newlabel{fig:visual_grid}{{3.3}{31}{Visual comparison of face restoration on a severe L3 sample. Our method (e) preserves the specific eye shape and lip texture better than generative models (c, d) which tend to "average out" the identity}{figure.caption.15}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.2}Illumination-Aware Heatmap Analysis}{31}{subsection.3.6.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.4}{\ignorespaces Identity Preservation Heatmap: Darker regions indicate areas of high ArcFace embedding stability. Our model maintains high stability in the periocular and nasal regions even under 4x upsampling.}}{32}{figure.caption.16}\protected@file@percent }
+\newlabel{fig:id_heatmap}{{3.4}{32}{Identity Preservation Heatmap: Darker regions indicate areas of high ArcFace embedding stability. Our model maintains high stability in the periocular and nasal regions even under 4x upsampling}{figure.caption.16}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.3}Resilience to Sensor Noise}{32}{subsection.3.6.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.3}{\ignorespaces Performance consistency under varying input noise levels ($\sigma $).}}{32}{table.caption.17}\protected@file@percent }
+\newlabel{tab:noise}{{3.3}{32}{Performance consistency under varying input noise levels ($\sigma $)}{table.caption.17}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.5}{\ignorespaces Degradation of identity similarity (ArcFace) as a function of sensor noise ($\sigma $). The proposed model exhibits a significantly shallower decay compared to the bicubic baseline.}}{32}{figure.caption.18}\protected@file@percent }
+\newlabel{fig:noise_plot}{{3.5}{32}{Degradation of identity similarity (ArcFace) as a function of sensor noise ($\sigma $). The proposed model exhibits a significantly shallower decay compared to the bicubic baseline}{figure.caption.18}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.4}Intermediate Pipeline Visualization}{33}{subsection.3.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.7}Illumination Classification Performance}{33}{section.3.7}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.4}{\ignorespaces Confusion Matrix for ANFIS Illumination Classification.}}{33}{table.caption.19}\protected@file@percent }
+\newlabel{tab:confusion}{{3.4}{33}{Confusion Matrix for ANFIS Illumination Classification}{table.caption.19}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.8}Computational Efficiency and Inference Latency}{34}{section.3.8}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.5}{\ignorespaces Inference latency vs. Image Resolution on NVIDIA RTX 3090.}}{34}{table.caption.20}\protected@file@percent }
+\newlabel{tab:latency_res}{{3.5}{34}{Inference latency vs. Image Resolution on NVIDIA RTX 3090}{table.caption.20}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.9}Human Perception vs. Machine Metrics: A Discussion}{34}{section.3.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.10}Ablation Study}{34}{section.3.10}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.6}{\ignorespaces Ablation study of the proposed modules.}}{34}{table.caption.21}\protected@file@percent }
+\newlabel{tab:ablation}{{3.6}{34}{Ablation study of the proposed modules}{table.caption.21}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.11}Failure Case Analysis and Boundary Conditions}{35}{section.3.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.12}FFT Spectrum Analysis and Texture-Structure Decoupling}{35}{section.3.12}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.6}{\ignorespaces 2D FFT Power Spectrum comparison. (a) Raw LR Input showing a collapsed high-frequency tail; (b) GFPGAN showing artificial high-frequency "rings"; (c) Proposed ANFIS-LLFSR showing a natural, broad-spectrum recovery of textural details.}}{36}{figure.caption.22}\protected@file@percent }
+\newlabel{fig:fft_spectrum}{{3.6}{36}{2D FFT Power Spectrum comparison. (a) Raw LR Input showing a collapsed high-frequency tail; (b) GFPGAN showing artificial high-frequency "rings"; (c) Proposed ANFIS-LLFSR showing a natural, broad-spectrum recovery of textural details}{figure.caption.22}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.13}Qualitative Evaluation: The Forensic Expert's Perspective}{36}{section.3.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.14}Attribute-Specific Restoration Analysis}{36}{section.3.14}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.7}{\ignorespaces Identity similarity across different facial attributes.}}{37}{table.caption.23}\protected@file@percent }
+\newlabel{tab:attributes}{{3.7}{37}{Identity similarity across different facial attributes}{table.caption.23}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.15}Cross-Dataset Generalization}{37}{section.3.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.15.1}Performance on LFW}{37}{subsection.3.15.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.15.2}Performance on Real-World Low-Light Images}{37}{subsection.3.15.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.16}Real-Time Processing and Dashboard Implementation}{37}{section.3.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.16.1}Multi-Threaded Inference Architecture}{37}{subsection.3.16.1}\protected@file@percent }
+\citation{dong2014learning}
+\citation{wang2018esrgan}
+\citation{li2020zero}
+\citation{yang2020hifacegan}
+\citation{menon2020pulse}
+\citation{wang2021towards}
+\citation{zhou2022codeformer}
+\citation{liang2021swinir}
+\citation{yang2021gan}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.16.2}Real-Time Metrics and Scalability}{38}{subsection.3.16.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.16.3}Visualization of the Fuzzy Manifold}{38}{subsection.3.16.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.17}Exhaustive Comparison with State-of-the-Art Methods}{38}{section.3.17}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.8}{\ignorespaces Exhaustive performance comparison across 10 SOTA methods.}}{38}{table.caption.24}\protected@file@percent }
+\newlabel{tab:exhaustive}{{3.8}{38}{Exhaustive performance comparison across 10 SOTA methods}{table.caption.24}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.7}{\ignorespaces Restoration of a severe L3 sample ($\gamma =4.2$, $\sigma =0.04$). The input (left) is almost entirely black. The ANFIS module estimated $DF=0.92$, triggering maximal SFT modulation. The LCR hallucination successfully recovered the eye symmetry, which was further polished by the Swin blocks.}}{39}{figure.caption.25}\protected@file@percent }
+\newlabel{fig:gallery1}{{3.7}{39}{Restoration of a severe L3 sample ($\gamma =4.2$, $\sigma =0.04$). The input (left) is almost entirely black. The ANFIS module estimated $DF=0.92$, triggering maximal SFT modulation. The LCR hallucination successfully recovered the eye symmetry, which was further polished by the Swin blocks}{figure.caption.25}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.8}{\ignorespaces Detailed recovery of thin-rimmed eyeglasses. Traditional CNN models often blur these structures into the skin. Our locality-constrained approach utilizes dictionary atoms containing sharp edge priors to maintain the geometric integrity of the eyewear.}}{39}{figure.caption.26}\protected@file@percent }
+\newlabel{fig:gallery2}{{3.8}{39}{Detailed recovery of thin-rimmed eyeglasses. Traditional CNN models often blur these structures into the skin. Our locality-constrained approach utilizes dictionary atoms containing sharp edge priors to maintain the geometric integrity of the eyewear}{figure.caption.26}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.18}Synthesis of Theoretical and Experimental Findings}{39}{section.3.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.18.1}Validation of the Fuzzy-Neural Synergy}{39}{subsection.3.18.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.18.2}Validation Matrix for Research Gaps}{39}{subsection.3.18.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.19}Dataset Augmentation Strategy}{39}{section.3.19}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.9}{\ignorespaces Profile-view restoration challenge. Side-view faces have fewer pre-aligned dictionary atoms. The model demonstrates robustness to pose variation by utilizing the shifted-window attention of the Swin Transformer to capture the asymmetric lighting profile.}}{40}{figure.caption.27}\protected@file@percent }
+\newlabel{fig:gallery3}{{3.9}{40}{Profile-view restoration challenge. Side-view faces have fewer pre-aligned dictionary atoms. The model demonstrates robustness to pose variation by utilizing the shifted-window attention of the Swin Transformer to capture the asymmetric lighting profile}{figure.caption.27}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.10}{\ignorespaces Analysis of denoising artifacts. In high-ISO noise scenarios, the Wavelet-Frequency fusion block acts as a high-pass filter, removing the stochastic noise components while preserving the underlying facial manifold structure.}}{40}{figure.caption.28}\protected@file@percent }
+\newlabel{fig:gallery4}{{3.10}{40}{Analysis of denoising artifacts. In high-ISO noise scenarios, the Wavelet-Frequency fusion block acts as a high-pass filter, removing the stochastic noise components while preserving the underlying facial manifold structure}{figure.caption.28}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.19.1}Geometric Augmentations}{40}{subsection.3.19.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.19.2}Photometric Augmentations}{40}{subsection.3.19.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.20}Analysis of Failure Cases and Boundary Conditions}{40}{section.3.20}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.11}{\ignorespaces Visualization of the ANFIS decision surface for the "Mean Intensity" vs. "Local Contrast" features. The surface shows a smooth, non-linear mapping that accurately represents the increasing restoration difficulty in low-contrast regions.}}{41}{figure.caption.29}\protected@file@percent }
+\newlabel{fig:gallery5}{{3.11}{41}{Visualization of the ANFIS decision surface for the "Mean Intensity" vs. "Local Contrast" features. The surface shows a smooth, non-linear mapping that accurately represents the increasing restoration difficulty in low-contrast regions}{figure.caption.29}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.12}{\ignorespaces Training loss trajectory. The blue curve represents the total loss, while the orange curve represents the ArcFace identity loss. The "staircase" pattern in the identity loss indicates the moments where the scheduler decreased the learning rate to stabilize the embedding manifold.}}{41}{figure.caption.30}\protected@file@percent }
+\newlabel{fig:gallery6}{{3.12}{41}{Training loss trajectory. The blue curve represents the total loss, while the orange curve represents the ArcFace identity loss. The "staircase" pattern in the identity loss indicates the moments where the scheduler decreased the learning rate to stabilize the embedding manifold}{figure.caption.30}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.21}The Pareto Frontier: Aesthetic Realism vs. Forensic Fidelity}{41}{section.3.21}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.9}{\ignorespaces Edge device performance benchmarks (512x512 resolution).}}{42}{table.caption.31}\protected@file@percent }
+\newlabel{tab:edge}{{3.9}{42}{Edge device performance benchmarks (512x512 resolution)}{table.caption.31}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3.10}{\ignorespaces Mapping results to research objectives.}}{42}{table.caption.32}\protected@file@percent }
+\newlabel{tab:validation_matrix}{{3.10}{42}{Mapping results to research objectives}{table.caption.32}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.22}Ablation of Attention Mechanisms}{42}{section.3.22}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.11}{\ignorespaces Comparison of different attention modules in the SwinFuzzyLCR refinement stage.}}{42}{table.caption.33}\protected@file@percent }
+\newlabel{tab:attention_ablation}{{3.11}{42}{Comparison of different attention modules in the SwinFuzzyLCR refinement stage}{table.caption.33}{}}
+\@setckpt{chapters/chapter3}{
+\setcounter{page}{43}
+\setcounter{equation}{0}
+\setcounter{enumi}{3}
+\setcounter{enumii}{0}
+\setcounter{enumiii}{0}
+\setcounter{enumiv}{0}
+\setcounter{footnote}{0}
+\setcounter{mpfootnote}{0}
+\setcounter{part}{0}
+\setcounter{chapter}{3}
+\setcounter{section}{22}
+\setcounter{subsection}{0}
+\setcounter{subsubsection}{0}
+\setcounter{paragraph}{0}
+\setcounter{subparagraph}{0}
+\setcounter{figure}{12}
+\setcounter{table}{11}
+\setcounter{parentequation}{0}
+\setcounter{section@level}{0}
+\setcounter{Item}{41}
+\setcounter{Hfootnote}{0}
+\setcounter{bookmark@seq@number}{139}
+\setcounter{caption@flags}{2}
+\setcounter{continuedfloat}{0}
+\setcounter{subfigure}{0}
+\setcounter{subtable}{0}
+\setcounter{float@type}{8}
+\setcounter{algorithm}{0}
+\setcounter{ALC@unique}{0}
+\setcounter{ALC@line}{0}
+\setcounter{ALC@rem}{0}
+\setcounter{ALC@depth}{0}
+\setcounter{lofdepth}{1}
+\setcounter{lotdepth}{1}
+}

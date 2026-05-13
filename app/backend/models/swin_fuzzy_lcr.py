@@ -158,6 +158,24 @@ class WaveletFusionBlock(nn.Module):
         return fused + x # Residual connection
 
 
+# TASK 24 — LIGHTWEIGHT CHANNEL ATTENTION
+class ChannelAttention(nn.Module):
+    def __init__(self, in_channels, reduction=8):
+        super(ChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(in_channels, in_channels // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(in_channels // reduction, in_channels, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
+
 class SwinFuzzyLCR(nn.Module):
     """
     The Ultimate SOTA Hybrid Architecture:
@@ -166,12 +184,31 @@ class SwinFuzzyLCR(nn.Module):
     def __init__(self, in_channels=3, out_channels=3, feature_dim=64):
         super(SwinFuzzyLCR, self).__init__()
         
-        # 1. Feature Extraction (Simulating ZeroDCE initial convolution)
+        # 1. Feature Extraction
         self.feat_extract = nn.Conv2d(in_channels, feature_dim, kernel_size=3, padding=1)
         
+        # TASK 10: Degradation CNN Encoder
+        self.condition_encoder = nn.Sequential(
+            nn.Conv2d(in_channels, 32, 3, stride=2, padding=1),
+            nn.ReLU(True),
+            nn.Conv2d(32, 64, 3, stride=2, padding=1),
+            nn.ReLU(True),
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(),
+            nn.Linear(64, 6) # 6D degradation latent
+        )
+        
         # 2. Spatial Feature Transform (Fuzzy Modulation)
-        # Synchronized with 5-D ANFIS feature vector (Task 11)
-        self.sft = SpatialFeatureTransform(feature_dim, condition_dim=5)
+        # Hybrid ANFIS (5D) + Learned (6D) = 11D total condition
+        self.sft = SpatialFeatureTransform(feature_dim, condition_dim=11)
+        
+        # TASK 7: Identity-Aware Residual Modulation
+        # Inject ArcFace embeddings (512-D) into the residual branch
+        self.id_injection = nn.Sequential(
+            nn.Linear(512, 128),
+            nn.ReLU(True),
+            nn.Linear(128, feature_dim)
+        )
         
         # 3. SwinIR Backbone (Simplified for demonstration, would typically import from models)
         # In a full implementation, this uses shifted-window attention blocks.
@@ -203,21 +240,58 @@ class SwinFuzzyLCR(nn.Module):
         
         # 5. Output Reconstruction & 8x Upsampling (64x64 -> 512x512)
         # Phase-aligned PixelShuffle sequence for stable high-res reconstruction
-        self.reconstruction = nn.Sequential(
+        # Task 24: Channel Attention boost
+        self.ca = ChannelAttention(feature_dim)
+        
+        self.reconstruction_low = nn.Sequential(
             nn.Conv2d(256, feature_dim * 4, kernel_size=3, padding=1),
             nn.PixelShuffle(2), # 2x (64 -> 128)
             nn.LeakyReLU(0.2, True),
+            nn.Conv2d(feature_dim, 3, kernel_size=3, padding=1)
+        )
+        
+        self.reconstruction_mid = nn.Sequential(
             nn.Conv2d(feature_dim, feature_dim * 4, kernel_size=3, padding=1),
             nn.PixelShuffle(2), # 2x (128 -> 256)
             nn.LeakyReLU(0.2, True),
+            nn.Conv2d(feature_dim, 3, kernel_size=3, padding=1)
+        )
+        
+        self.reconstruction_high = nn.Sequential(
             nn.Conv2d(feature_dim, feature_dim * 4, kernel_size=3, padding=1),
             nn.PixelShuffle(2), # 2x (256 -> 512)
             nn.LeakyReLU(0.2, True),
-            nn.Conv2d(feature_dim, out_channels, kernel_size=3, padding=1)
+            nn.Conv2d(feature_dim, 3, kernel_size=3, padding=1)
+        )
+
+        # TASK 8: Deterministic Residual Diffusion Refinement
+        # A tiny refinement network that acts on the residual space
+        self.residual_refiner = nn.Sequential(
+            nn.Conv2d(3, 32, 3, padding=1),
+            nn.ReLU(True),
+            nn.Conv2d(32, 32, 3, padding=1),
+            nn.ReLU(True),
+            nn.Conv2d(32, 3, 3, padding=1)
+        )
+        self.up1 = nn.Sequential(
+            nn.Conv2d(256, feature_dim * 4, kernel_size=3, padding=1),
+            nn.PixelShuffle(2),
+            nn.LeakyReLU(0.2, True)
+        )
+        self.up2 = nn.Sequential(
+            nn.Conv2d(feature_dim, feature_dim * 4, kernel_size=3, padding=1),
+            nn.PixelShuffle(2),
+            nn.LeakyReLU(0.2, True)
+        )
+        self.up3 = nn.Sequential(
+            nn.Conv2d(feature_dim, feature_dim * 4, kernel_size=3, padding=1),
+            nn.PixelShuffle(2),
+            nn.LeakyReLU(0.2, True)
         )
 
     def forward(self, x: torch.Tensor, 
                 anfis_condition: torch.Tensor,
+                identity_emb: Optional[torch.Tensor] = None,
                 residual_scale: float = 0.15) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         x: [B, 3, H, W] Low-light degraded image
@@ -229,14 +303,19 @@ class SwinFuzzyLCR(nn.Module):
 
         # Extract base features
         feat = self.feat_extract(x)
+        
+        # Task 10: Degradation condition
+        learned_cond = self.condition_encoder(x)
+        full_cond = torch.cat([anfis_condition, learned_cond], dim=1)
+        
         dbg = _dbg()
         if dbg:
             dbg.log_tensor(x, name="sota_input", stage="vq")
             dbg.log_tensor(anfis_condition, name="sota_anfis_condition", stage="routing")
             dbg.log_tensor(feat, name="feat_extract", stage="vq")
 
-        # Modulate features adaptively based on Fuzzy Logic (ANFIS)
-        feat_sft, fuzzy_heatmap = self.sft(feat, anfis_condition)
+        # Modulate features adaptively based on Fuzzy Logic (ANFIS) + Learned
+        feat_sft, fuzzy_heatmap = self.sft(feat, full_cond)
 
         # Hierarchical Feature Processing (SwinIR)
         deep_feat = self.swin_blocks(feat_sft)
@@ -269,17 +348,46 @@ class SwinFuzzyLCR(nn.Module):
         latent_weight = 0.05
         lcr_latent = projected_latent * latent_weight + identity_latent * (1.0 - latent_weight)
 
-        # 6. Upsample and Reconstruct
-        out = self.reconstruction(lcr_latent)
+        # 6. Multi-Scale Upsample and Reconstruct (Task 1)
+        # Task 7: Inject identity embedding if provided
+        if identity_emb is not None:
+            id_mod = self.id_injection(identity_emb).unsqueeze(-1).unsqueeze(-1)
+            lcr_latent = lcr_latent + id_mod
+            
+        # Task 24: Apply Channel Attention before reconstruction
+        lcr_attended = self.ca(lcr_latent)
         
-        # TASK 3 & 4: Strict Residual Clamping [-0.04, 0.04]
+        # Branch 1: Low-Frequency (64 -> 128)
+        feat_128 = self.up1(lcr_attended)
+        r_low = self.reconstruction_low[-1](feat_128) # Just the last conv
+        
+        # Branch 2: Mid-Frequency (128 -> 256)
+        feat_256 = self.up2(feat_128)
+        r_mid = self.reconstruction_mid[-1](feat_256)
+        
+        # Branch 3: High-Frequency (256 -> 512)
+        feat_512 = self.up3(feat_256)
+        r_high = self.reconstruction_high[-1](feat_512)
+        
+        # TASK 1: SR = Bicubic + R_low + R_mid + R_high
+        # We need to interpolate r_low and r_mid to 512x512
+        r_low_up = F.interpolate(r_low, size=(512, 512), mode='bilinear', align_corners=False)
+        r_mid_up = F.interpolate(r_mid, size=(512, 512), mode='bilinear', align_corners=False)
+        
+        residual = r_low_up + r_mid_up + r_high
+        
+        # Task 8: Deterministic Residual Diffusion Refinement
+        # Refine the combined multi-scale residual
+        residual = residual + self.residual_refiner(residual)
+        
         # TASK 18: Resolution Alignment (Dynamic Anchor)
         # Ensure anchor size matches model output resolution (out.shape)
         x_up = F.interpolate(x, size=(out.shape[2], out.shape[3]), mode='bilinear', align_corners=False)
         residual = out - x_up
         
+        # TASK 2 & 3: Increased Residual Contribution and Clamping
         # Strict range prevents geometry distortion (Task 3)
-        clamped_residual = torch.clamp(residual, -0.04, 0.04) * residual_scale
+        clamped_residual = torch.clamp(residual, -0.15, 0.15) * residual_scale
         
         final_out = (x_up + clamped_residual).clamp(0.0, 1.0)
         

@@ -527,18 +527,31 @@ class ANFISFaceSRPipeline:
             # TASK 11: Use 5-D feature subset (synchronized)
             cond_t = torch.from_numpy(feats[:5]).unsqueeze(0).to(self.device).float()
             
-            # 1. Forward Pass
-            sr_t, _, heatmap_t = self.sota_model(current_t, cond_t, residual_scale=residual_scale)
+            # 1. Forward Pass (Task 7: Identity Injection)
+            id_emb = None
+            if self.face_recognizer is not None:
+                try:
+                    # Extract identity embedding from the illuminated image for residual guidance
+                    # We use a 112x112 crop for ArcFace
+                    id_emb = self.face_recognizer.model.extract_embedding((current * 255).astype(np.uint8))
+                    if id_emb is not None:
+                        id_emb = id_emb.unsqueeze(0).to(self.device).float()
+                except Exception as e:
+                    print(f"  ⚠ Identity extraction for residual branch failed: {e}")
+
+            sr_t, _, heatmap_t = self.sota_model(current_t, cond_t, identity_emb=id_emb, residual_scale=residual_scale)
+            
             if sr_t.shape[2] != 512:
                 sr_t = torch.nn.functional.interpolate(sr_t, size=(512, 512), mode='bicubic')
             
             current_up_t = torch.nn.functional.interpolate(current_t, size=(512, 512), mode='bilinear')
             
             # 2. Blending (Bicubic Anchor vs SR)
+            # Task 3: Increase SR contribution in restoration mode
             anchor_t = torch.from_numpy(anchor_upscale.transpose(2, 0, 1)).unsqueeze(0).to(self.device)
             current_up_t = current_up_t.contiguous().float()
             sr_t = sr_t.contiguous().float()
-            blend_t = ( (1.0 - blend_alpha) * current_up_t + blend_alpha * sr_t ).clamp(0.0, 1.0)
+            blend_t = ( (1.0 - blend_alpha) * anchor_t + blend_alpha * sr_t ).clamp(0.0, 1.0)
             
             from utils.image_utils import normalize_image_pipeline
             candidate_f = normalize_image_pipeline(blend_t, target_format='numpy', target_dtype='float32')
@@ -677,13 +690,24 @@ class ANFISFaceSRPipeline:
                     # Indices for eyes, brows, lips in 106-point model
                     roi_indices = list(range(33, 51)) + list(range(52, 72)) + list(range(84, 106))
                     pts = landmarks[roi_indices].astype(np.int32)
-                    for pt in pts:
-                        cv2.circle(mask, tuple(pt), 15, 1.0, -1)
-                    mask = cv2.GaussianBlur(mask, (31, 31), 10)
                     
-                    # Apply sharpening
-                    blur = cv2.GaussianBlur(final_f, (0, 0), 3)
-                    sharpened = 1.8 * final_f - 0.8 * blur
+                    # Create convex hulls for more precise ROI masking
+                    left_eye = landmarks[33:42].astype(np.int32)
+                    right_eye = landmarks[42:51].astype(np.int32)
+                    brows = landmarks[52:72].astype(np.int32)
+                    lips = landmarks[84:106].astype(np.int32)
+                    
+                    for roi_pts in [left_eye, right_eye, brows, lips]:
+                        hull = cv2.convexHull(roi_pts)
+                        cv2.drawContours(mask, [hull], -1, 1.0, -1)
+                    
+                    mask = cv2.GaussianBlur(mask, (21, 21), 5)
+                    
+                    # Apply sharpening (Task 13: Strength <= 0.15)
+                    blur = cv2.GaussianBlur(final_f, (0, 0), 2)
+                    # final = base + mask * strength * (base - blur)
+                    sharpen_strength = 0.15
+                    sharpened = final_f + sharpen_strength * (final_f - blur)
                     final_f = mask[:,:,None] * sharpened + (1 - mask[:,:,None]) * final_f
             except Exception as e:
                 print(f"  [ROI SHARPEN WARNING] Failed: {e}")

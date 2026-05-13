@@ -1,0 +1,89 @@
+\documentclass[12pt,a4paper,oneside]{report}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{times} % Times New Roman
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage[demo]{graphicx}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{bm} % Bold math
+\usepackage{hyperref}
+\usepackage{cite} % IEEE style
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs} % Professional tables
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{tocloft}
+\usepackage{etoolbox}
+
+% Line Spacing
+\onehalfspacing
+
+% Heading Styles
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries}{Chapter \thechapter}{20pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{-20pt}{40pt}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries}{\thesubsection}{1em}{}
+
+% Captions
+\captionsetup[figure]{font=small, labelfont=bf, justification=centering, position=bottom, skip=10pt}
+\captionsetup[table]{font=small, labelfont=bf, justification=centering, position=top, skip=10pt}
+
+% Page Numbering
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\thepage}
+\lhead{\leftmark}
+\renewcommand{\headrulewidth}{0.5pt}
+
+% TOC Customization
+\renewcommand{\cftchapfont}{\bfseries}
+\renewcommand{\cftchappagefont}{\bfseries}
+\renewcommand{\cftchappresnum}{Chapter }
+\renewcommand{\cftchapaftersnum}{:}
+\setlength{\cftchapnumwidth}{6em}
+
+\begin{document}
+
+% --- Front Matter ---
+\pagenumbering{roman}
+
+\include{front/title}
+\include{front/certificate}
+\include{front/declaration}
+\include{front/acknowledgement}
+\include{front/similarity}
+\include{front/abstract}
+\include{front/symbols}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\listofalgorithms
+
+\clearpage
+\pagenumbering{arabic}
+
+% --- Chapters ---
+\include{chapters/chapter1}
+\include{chapters/chapter2}
+\include{chapters/chapter3}
+\include{chapters/chapter4}
+\include{chapters/chapter5}
+
+% --- Back Matter ---
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\include{appendix}
+
+\end{document}

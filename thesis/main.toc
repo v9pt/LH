@@ -1,0 +1,180 @@
+\contentsline {chapter}{\numberline {1}INTRODUCTION AND LITERATURE REVIEW}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Motivation}{1}{section.1.1}%
+\contentsline {subsection}{\numberline {1.1.1}The Surveillance Gap and Perceptual Disconnect}{1}{subsection.1.1.1}%
+\contentsline {subsection}{\numberline {1.1.2}The Forensic Reality: Photon Starvation and Sensor Thermal Noise}{1}{subsection.1.1.2}%
+\contentsline {section}{\numberline {1.2}Real-World Relevance and Applications}{2}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Problem Formulation and Forensic Scope}{2}{section.1.3}%
+\contentsline {subsection}{\numberline {1.3.1}Illumination Uncertainty}{2}{subsection.1.3.1}%
+\contentsline {subsection}{\numberline {1.3.2}Compound Degradation Pipeline}{3}{subsection.1.3.2}%
+\contentsline {subsection}{\numberline {1.3.3}Identity Preservation and Hallucination}{3}{subsection.1.3.3}%
+\contentsline {section}{\numberline {1.4}Evolution of Facial Restoration Paradigms}{3}{section.1.4}%
+\contentsline {subsection}{\numberline {1.4.1}The Pre-Deep Learning Era: From Bilinear to Sparse Coding}{4}{subsection.1.4.1}%
+\contentsline {subsection}{\numberline {1.4.2}The CNN Revolution: Learning End-to-End Mappings}{4}{subsection.1.4.2}%
+\contentsline {subsection}{\numberline {1.4.3}Generative Facial Priors and the Identity Drift Paradox}{4}{subsection.1.4.3}%
+\contentsline {subsubsection}{Identity Preservation Theory: The Role of ArcFace}{4}{subsection.1.4.3}%
+\contentsline {subsection}{\numberline {1.4.4}Additive Angular Margin Loss: Mathematical Intuition}{5}{subsection.1.4.4}%
+\contentsline {subsection}{\numberline {1.4.5}Additive Angular Margin Loss}{5}{subsection.1.4.5}%
+\contentsline {subsection}{\numberline {1.4.6}ArcFace as a Geometric Sentinel}{5}{subsection.1.4.6}%
+\contentsline {subsubsection}{Locality Constraints in Face Restoration}{5}{subsection.1.4.6}%
+\contentsline {subsection}{\numberline {1.4.7}Deep Learning and CNN-based Approaches}{5}{subsection.1.4.7}%
+\contentsline {subsubsection}{Evolution of Loss Functions}{5}{subsection.1.4.7}%
+\contentsline {subsection}{\numberline {1.4.8}GANs and Generative Facial Priors}{6}{subsection.1.4.8}%
+\contentsline {subsubsection}{The Problem of Identity Drift in GANs}{6}{subsection.1.4.8}%
+\contentsline {subsection}{\numberline {1.4.9}Transformer-based Restoration}{6}{subsection.1.4.9}%
+\contentsline {subsection}{\numberline {1.4.10}Neuro-Fuzzy Systems in Image Processing}{6}{subsection.1.4.10}%
+\contentsline {subsubsection}{Jang (1993): The ANFIS Foundation}{6}{subsection.1.4.10}%
+\contentsline {subsubsection}{Evolution of Fuzzy Enhancement}{6}{subsection.1.4.10}%
+\contentsline {subsection}{\numberline {1.4.11}State-of-the-Art Face Restoration Models}{7}{subsection.1.4.11}%
+\contentsline {subsubsection}{GFPGAN: Generative Facial Prior}{7}{subsection.1.4.11}%
+\contentsline {subsubsection}{CodeFormer: Discrete Codebook Priors}{7}{subsection.1.4.11}%
+\contentsline {subsubsection}{SwinIR: Transformer-based Restoration}{7}{subsection.1.4.11}%
+\contentsline {section}{\numberline {1.5}Summary of Literature and Research Positioning}{7}{section.1.5}%
+\contentsline {subsection}{\numberline {1.5.1}Comprehensive Literature Review Table}{8}{subsection.1.5.1}%
+\contentsline {subsection}{\numberline {1.5.2}Research Gap Identification}{8}{subsection.1.5.2}%
+\contentsline {section}{\numberline {1.6}Problem Statement and Research Questions}{9}{section.1.6}%
+\contentsline {subsection}{\numberline {1.6.1}Research Questions (RQ)}{9}{subsection.1.6.1}%
+\contentsline {section}{\numberline {1.7}Project Scope and Boundries}{9}{section.1.7}%
+\contentsline {section}{\numberline {1.8}Ethical Considerations and Privacy}{10}{section.1.8}%
+\contentsline {subsection}{\numberline {1.8.1}Consent and Data Privacy}{10}{subsection.1.8.1}%
+\contentsline {subsection}{\numberline {1.8.2}Mitigating Bias and Fairness}{10}{subsection.1.8.2}%
+\contentsline {section}{\numberline {1.9}Evolution of Attention Mechanisms in Computer Vision}{10}{section.1.9}%
+\contentsline {subsection}{\numberline {1.9.1}Channel Attention and Squeeze-and-Excitation}{10}{subsection.1.9.1}%
+\contentsline {subsection}{\numberline {1.9.2}Spatial Attention and Non-Local Networks}{11}{subsection.1.9.2}%
+\contentsline {subsection}{\numberline {1.9.3}Shifted-Window Attention (Swin)}{11}{subsection.1.9.3}%
+\contentsline {section}{\numberline {1.10}Historical Overview of Fuzzy Logic in Image Processing}{11}{section.1.10}%
+\contentsline {subsection}{\numberline {1.10.1}Early Fuzzy Filtering}{11}{subsection.1.10.1}%
+\contentsline {subsection}{\numberline {1.10.2}Emergence of Neuro-Fuzzy Systems}{11}{subsection.1.10.2}%
+\contentsline {subsection}{\numberline {1.10.3}Fuzzy Logic in the Deep Learning Era}{11}{subsection.1.10.3}%
+\contentsline {section}{\numberline {1.11}Evolution of Image Quality Assessment (IQA) Metrics}{12}{section.1.11}%
+\contentsline {subsection}{\numberline {1.11.1}Pixel-Based Metrics: PSNR and MSE}{12}{subsection.1.11.1}%
+\contentsline {subsection}{\numberline {1.11.2}Structural Metrics: SSIM}{12}{subsection.1.11.2}%
+\contentsline {subsection}{\numberline {1.11.3}Deep Perceptual Metrics: LPIPS}{12}{subsection.1.11.3}%
+\contentsline {section}{\numberline {1.12}Organization of Thesis}{12}{section.1.12}%
+\contentsline {chapter}{\numberline {2}MATHEMATICAL MODELING AND METHODS}{13}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Introduction}{13}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}The Evolution of the ANFIS-Swin Hybrid}{13}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}Rejected Architectural Alternatives and Lessons Learned}{13}{subsection.2.1.2}%
+\contentsline {section}{\numberline {2.2}Data Preprocessing and Feature Extraction}{14}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Statistical Feature Extraction for ANFIS}{14}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}Degradation Analysis and Manifold Visualization}{15}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.2.3}Synthetic Degradation Pipeline}{15}{subsection.2.2.3}%
+\contentsline {section}{\numberline {2.3}Baseline Model Selection and Rationale}{15}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}SRCNN: Convolutional Super-Resolution}{16}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Zero-DCE: Illumination Benchmarking}{16}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}CodeFormer: Structural SOTA}{16}{subsection.2.3.3}%
+\contentsline {section}{\numberline {2.4}The Neuro-Fuzzy Meta-Controller (ANFIS)}{16}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}Fuzzification: Mapping the Darkness Manifold}{16}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}Layer 2: Rule Firing Strength}{17}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.3}Layer 3: Normalization}{17}{subsection.2.4.3}%
+\contentsline {subsection}{\numberline {2.4.4}Layer 4: Consequent Layer}{17}{subsection.2.4.4}%
+\contentsline {subsection}{\numberline {2.4.5}Defuzzification and Rule Visualization}{18}{subsection.2.4.5}%
+\contentsline {subsection}{\numberline {2.4.6}Premise Parameter Optimization via Gradient Descent}{18}{subsection.2.4.6}%
+\contentsline {subsection}{\numberline {2.4.7}Consequent Parameter Optimization via Recursive Least Squares (RLS)}{18}{subsection.2.4.7}%
+\contentsline {section}{\numberline {2.5}Structural Anchoring via Locality Constrained Representation (LCR)}{19}{section.2.5}%
+\contentsline {subsection}{\numberline {2.5.1}LCR Encoding and Sparse Priors}{19}{subsection.2.5.1}%
+\contentsline {subsection}{\numberline {2.5.2}Closed-Form Optimization and Complexity Bottlenecks}{19}{subsection.2.5.2}%
+\contentsline {subsection}{\numberline {2.5.3}Theoretical Bounds of Sparse Reconstruction in Low-Light}{19}{subsection.2.5.3}%
+\contentsline {section}{\numberline {2.6}System Hyperparameters and Configuration}{19}{section.2.6}%
+\contentsline {section}{\numberline {2.7}Computational Complexity and Runtime Profile}{20}{section.2.7}%
+\contentsline {section}{\numberline {2.8}Identity Preservation Theory: The Role of ArcFace}{21}{section.2.8}%
+\contentsline {subsection}{\numberline {2.8.1}Additive Angular Margin Loss}{21}{subsection.2.8.1}%
+\contentsline {subsection}{\numberline {2.8.2}ArcFace as a Geometric Sentinel}{21}{subsection.2.8.2}%
+\contentsline {section}{\numberline {2.9}Training Procedure and Execution Loop}{21}{section.2.9}%
+\contentsline {subsection}{\numberline {2.9.1}Addressing Training Divergence in Multi-Loss Optimization}{21}{subsection.2.9.1}%
+\contentsline {section}{\numberline {2.10}Membership Function Design and Sensitivity Analysis}{22}{section.2.10}%
+\contentsline {subsection}{\numberline {2.10.1}Gaussian vs. Triangular Membership Functions}{22}{subsection.2.10.1}%
+\contentsline {subsection}{\numberline {2.10.2}Impact of MF Overlap}{22}{subsection.2.10.2}%
+\contentsline {section}{\numberline {2.11}Recursive Least Squares (RLS) Convergence Properties}{22}{section.2.11}%
+\contentsline {subsection}{\numberline {2.11.1}Analytic Solution vs. Iterative Search}{22}{subsection.2.11.1}%
+\contentsline {section}{\numberline {2.12}Transformer-based Feature Refinement}{23}{section.2.12}%
+\contentsline {subsection}{\numberline {2.12.1}Window-based Self-Attention}{23}{subsection.2.12.1}%
+\contentsline {subsection}{\numberline {2.12.2}Shifted Window Partitioning}{23}{subsection.2.12.2}%
+\contentsline {subsection}{\numberline {2.12.3}SwinIR for Super-Resolution}{23}{subsection.2.12.3}%
+\contentsline {subsection}{\numberline {2.12.4}Adaptive Locality Selection Logic}{23}{subsection.2.12.4}%
+\contentsline {subsection}{\numberline {2.12.5}Signal-Dependent Bandwidth Modulation}{23}{subsection.2.12.5}%
+\contentsline {subsection}{\numberline {2.12.6}Weighted Dictionary Sampling}{24}{subsection.2.12.6}%
+\contentsline {subsection}{\numberline {2.12.7}ANFIS-Guided Reweighting}{24}{subsection.2.12.7}%
+\contentsline {section}{\numberline {2.13}SwinFuzzyLCR Refinement Network}{24}{section.2.13}%
+\contentsline {subsection}{\numberline {2.13.1}Spatial Feature Transform (SFT)}{24}{subsection.2.13.1}%
+\contentsline {subsection}{\numberline {2.13.2}Convolutional Block Attention Module (CBAM)}{25}{subsection.2.13.2}%
+\contentsline {subsection}{\numberline {2.13.3}Wavelet-Frequency Fusion for Texture Recovery}{25}{subsection.2.13.3}%
+\contentsline {section}{\numberline {2.14}Identity Preservation via ArcFace Sentinel}{25}{section.2.14}%
+\contentsline {subsection}{\numberline {2.14.1}ArcFace Embedding Space}{25}{subsection.2.14.1}%
+\contentsline {subsection}{\numberline {2.14.2}Identity Loss Formulation}{26}{subsection.2.14.2}%
+\contentsline {section}{\numberline {2.15}Loss Functions}{26}{section.2.15}%
+\contentsline {section}{\numberline {2.16}Integrated Inference Workflow and Information Flow}{26}{section.2.16}%
+\contentsline {subsection}{\numberline {2.16.1}Hierarchical Information Flow}{26}{subsection.2.16.1}%
+\contentsline {subsection}{\numberline {2.16.2}Implementation Rationale: Preventing the "Average Face" Problem}{27}{subsection.2.16.2}%
+\contentsline {chapter}{\numberline {3}RESULTS AND DISCUSSION}{28}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Experimental Setup}{28}{section.3.1}%
+\contentsline {subsection}{\numberline {3.1.1}Hardware and Software Environment}{28}{subsection.3.1.1}%
+\contentsline {subsection}{\numberline {3.1.2}Training Protocol}{28}{subsection.3.1.2}%
+\contentsline {section}{\numberline {3.2}Dataset Characterization and Statistical Profile}{28}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}CelebA-HQ Statistical Distribution}{28}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Degradation Taxonomy}{29}{subsection.3.2.2}%
+\contentsline {section}{\numberline {3.3}Static Baseline Performance Analysis}{29}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Impact of Fixed Illumination Enhancement}{29}{subsection.3.3.1}%
+\contentsline {section}{\numberline {3.4}Benchmarking against Generative State-of-the-Art}{30}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Quantitative Synthesis and Identity-Fidelity Tradeoffs}{30}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Qualitative Forensic Evidence and Visual Audit}{31}{section.3.6}%
+\contentsline {subsection}{\numberline {3.6.1}Visual Reconstruction Performance}{31}{subsection.3.6.1}%
+\contentsline {subsection}{\numberline {3.6.2}Illumination-Aware Heatmap Analysis}{31}{subsection.3.6.2}%
+\contentsline {subsection}{\numberline {3.6.3}Resilience to Sensor Noise}{32}{subsection.3.6.3}%
+\contentsline {subsection}{\numberline {3.6.4}Intermediate Pipeline Visualization}{33}{subsection.3.6.4}%
+\contentsline {section}{\numberline {3.7}Illumination Classification Performance}{33}{section.3.7}%
+\contentsline {section}{\numberline {3.8}Computational Efficiency and Inference Latency}{34}{section.3.8}%
+\contentsline {section}{\numberline {3.9}Human Perception vs. Machine Metrics: A Discussion}{34}{section.3.9}%
+\contentsline {section}{\numberline {3.10}Ablation Study}{34}{section.3.10}%
+\contentsline {section}{\numberline {3.11}Failure Case Analysis and Boundary Conditions}{35}{section.3.11}%
+\contentsline {section}{\numberline {3.12}FFT Spectrum Analysis and Texture-Structure Decoupling}{35}{section.3.12}%
+\contentsline {section}{\numberline {3.13}Qualitative Evaluation: The Forensic Expert's Perspective}{36}{section.3.13}%
+\contentsline {section}{\numberline {3.14}Attribute-Specific Restoration Analysis}{36}{section.3.14}%
+\contentsline {section}{\numberline {3.15}Cross-Dataset Generalization}{37}{section.3.15}%
+\contentsline {subsection}{\numberline {3.15.1}Performance on LFW}{37}{subsection.3.15.1}%
+\contentsline {subsection}{\numberline {3.15.2}Performance on Real-World Low-Light Images}{37}{subsection.3.15.2}%
+\contentsline {section}{\numberline {3.16}Real-Time Processing and Dashboard Implementation}{37}{section.3.16}%
+\contentsline {subsection}{\numberline {3.16.1}Multi-Threaded Inference Architecture}{37}{subsection.3.16.1}%
+\contentsline {subsection}{\numberline {3.16.2}Real-Time Metrics and Scalability}{38}{subsection.3.16.2}%
+\contentsline {subsection}{\numberline {3.16.3}Visualization of the Fuzzy Manifold}{38}{subsection.3.16.3}%
+\contentsline {section}{\numberline {3.17}Exhaustive Comparison with State-of-the-Art Methods}{38}{section.3.17}%
+\contentsline {section}{\numberline {3.18}Synthesis of Theoretical and Experimental Findings}{39}{section.3.18}%
+\contentsline {subsection}{\numberline {3.18.1}Validation of the Fuzzy-Neural Synergy}{39}{subsection.3.18.1}%
+\contentsline {subsection}{\numberline {3.18.2}Validation Matrix for Research Gaps}{39}{subsection.3.18.2}%
+\contentsline {section}{\numberline {3.19}Dataset Augmentation Strategy}{39}{section.3.19}%
+\contentsline {subsection}{\numberline {3.19.1}Geometric Augmentations}{40}{subsection.3.19.1}%
+\contentsline {subsection}{\numberline {3.19.2}Photometric Augmentations}{40}{subsection.3.19.2}%
+\contentsline {section}{\numberline {3.20}Analysis of Failure Cases and Boundary Conditions}{40}{section.3.20}%
+\contentsline {section}{\numberline {3.21}The Pareto Frontier: Aesthetic Realism vs. Forensic Fidelity}{41}{section.3.21}%
+\contentsline {section}{\numberline {3.22}Ablation of Attention Mechanisms}{42}{section.3.22}%
+\contentsline {chapter}{\numberline {4}SYSTEM DESIGN AND PRACTICAL IMPLEMENTATION}{43}{chapter.4}%
+\contentsline {section}{\numberline {4.1}System Overview and Architectural Rationale}{43}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Software Architecture and Modular Organization}{43}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Core Logic Modules}{43}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}Neural Refinement Models}{43}{subsection.4.2.2}%
+\contentsline {section}{\numberline {4.3}Software Design Patterns}{44}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Hardware Topology and Parallelization}{44}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}Workstation Configuration}{44}{subsection.4.4.1}%
+\contentsline {subsection}{\numberline {4.4.2}Heterogeneous Parallelism}{44}{subsection.4.4.2}%
+\contentsline {section}{\numberline {4.5}Deployment Interface: The Real-Time Dashboard}{45}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Asynchronous Inference Pipeline}{45}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}Identity Verification Sentinel}{45}{subsection.4.5.2}%
+\contentsline {chapter}{\numberline {5}CONCLUSION AND FUTURE WORK}{46}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Summary of Thesis Achievements}{46}{section.5.1}%
+\contentsline {subsection}{\numberline {5.1.1}Key Technical Contributions}{46}{subsection.5.1.1}%
+\contentsline {section}{\numberline {5.2}Practical Impact and Possible Beneficiaries}{46}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Limitations and Boundaries}{47}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Future Research Directions}{47}{section.5.4}%
+\contentsline {subsection}{\numberline {5.4.1}Temporal Consistency in Video Forensics}{47}{subsection.5.4.1}%
+\contentsline {subsection}{\numberline {5.4.2}Diffusion-Based Generative Anchoring}{47}{subsection.5.4.2}%
+\contentsline {subsection}{\numberline {5.4.3}Privacy-Preserving Federated Learning}{47}{subsection.5.4.3}%
+\contentsline {section}{\numberline {5.5}Final Concluding Remarks}{48}{section.5.5}%
+\contentsline {chapter}{\numberline {6}CORE COMPUTATIONAL ALGORITHMS}{50}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Core Algorithms}{50}{section.6.1}%
+\contentsline {subsection}{\numberline {6.1.1}Computational Analysis of Restoration Algorithms}{51}{subsection.6.1.1}%
+\contentsline {chapter}{\numberline {7}EXTENDED MATHEMATICAL PROOFS}{52}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Locality Constrained Representation (LCR) Closed-Form Derivation}{52}{section.7.1}%
+\contentsline {chapter}{\numberline {8}GLOSSARY OF TECHNICAL TERMS}{53}{chapter.8}%
+\contentsline {chapter}{\numberline {9}LIST OF PUBLICATIONS AND MANUSCRIPTS}{54}{chapter.9}%
+\contentsline {chapter}{\numberline {10}RESEARCH ARTIFACTS REPOSITORY}{55}{chapter.10}%
+\contentsline {section}{\numberline {10.1}Wavelet-Frequency Fusion Logic}{55}{section.10.1}%
+\contentsline {chapter}{\numberline {11}FORENSIC DEPLOYMENT FLOWCHARTS}{56}{chapter.11}%

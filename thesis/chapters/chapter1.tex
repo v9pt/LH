@@ -1,0 +1,245 @@
+\chapter{INTRODUCTION AND LITERATURE REVIEW}
+
+\section{Motivation}
+Visual surveillance and biometric identification systems are integral to modern urban infrastructure and security protocols. However, the operational efficiency of these systems is fundamentally limited by the quality of the raw imagery. Facial captures under suboptimal illumination—commonly termed "low-light" environments—pose a persistent challenge for both human observers and automated algorithms.
+
+The motivation for this research is driven by two primary factors. First, from a security and forensic perspective, low-light images suffer from severe stochastic degradations, including Poisson noise and motion blur. These artifacts obscure the high-dimensional facial features necessary for identity verification, rendering conventional recognition pipelines ineffective. Second, from a computational imaging standpoint, restoring faces in dark environments is a highly ill-posed problem. While generic image enhancement improves global visibility, it often fails to preserve the identity-preserving structural anchors required for forensic integrity.
+
+\subsection{The Surveillance Gap and Perceptual Disconnect}
+In many urban scenarios, cameras are constrained by distance and lighting, leading to low-resolution, photon-starved captures. Traditional ISO boosting merely amplifies sensor noise, further masking the geometric landmarks of the face. Furthermore, there is a distinct disconnect between human perceptual quality (aesthetic brightness) and machine recognition requirements (feature gradients). This project aims to bridge this gap by designing a restoration framework that is both visually interpretable and identity-consistent.
+
+\subsection{The Forensic Reality: Photon Starvation and Sensor Thermal Noise}
+In actual field conditions, "low-light" is not merely a dark image; it is a manifestation of photon starvation. When a sensor captures fewer than 10 photons per pixel, the stochastic nature of light (Poisson distribution) becomes the dominant signal, rather than the subject's features. Furthermore, long integration times in surveillance cameras lead to sensor heating, introducing thermal noise that appears as "salt-and-pepper" artifacts. Our research is grounded in the necessity of modeling these physical constraints rather than treating the problem as a generic image-to-image translation task.
+
+\section{Real-World Relevance and Applications}
+The practical relevance of low-light face super-resolution (LLFSR) spans across several high-impact domains:
+
+\begin{enumerate}
+    \item \textbf{Public Safety and Surveillance:} Night-time surveillance in public spaces often produces grainy, low-contrast footage. LLFSR can transform these unusable captures into clear facial evidence, aiding in forensic investigations and suspect identification.
+    \item \textbf{Biometric Authentication:} Face-unlock features on mobile devices and secure entry systems frequently fail in dark rooms or under harsh shadows. An integrated LLFSR module can enhance the reliability of biometric sensors across varying environmental conditions.
+    \item \textbf{Autonomous Driving:} Night-time driver monitoring systems (DMS) rely on clear facial visibility to detect drowsiness or distraction. Enhancing these images in real-time can significantly improve vehicular safety.
+    \item \textbf{Legacy Media Restoration:} Historical archives often contain low-resolution, poorly lit photographs of significant figures. LLFSR provides a tool for digital preservation and restoration of these cultural assets.
+\end{enumerate}
+
+\section{Problem Formulation and Forensic Scope}
+The restoration of facial images in dark environments involves overcoming several inter-dependent technical hurdles:
+
+\subsection{Illumination Uncertainty}
+Unlike normal-light super-resolution, where the degradation is primarily spatial (downsampling), low-light SR involves a non-linear mapping of intensity values. The distribution of darkness is rarely uniform; regions of deep shadow coexist with ambient light, creating a high-dynamic-range (HDR) problem. Modeling this uncertainty requires adaptive mechanisms that can respond to varying local illumination levels.
+
+\subsection{Compound Degradation Pipeline}
+Low-light captures are seldom just "dark." To compensate for low photon counts, cameras often use high ISO settings (introducing sensor noise) and slower shutter speeds (introducing motion blur). A successful LLFSR system must therefore act as a joint denoiser, deblurrer, and super-resolver, preventing the amplification of artifacts during the upscaling process.
+
+\subsection{Identity Preservation and Hallucination}
+Deep learning models, particularly Generative Adversarial Networks (GANs), are prone to "hallucinating" realistic facial features that do not belong to the original subject. In security applications, a visually pleasing result is useless if it changes the identity of the person. Preserving the geometric and textural "anchor points" of the face while hallucinating missing details is the central challenge of this field.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Degradation Modalities and their Impact on Facial Reconstruction.}
+    \label{tab:degradation_impact}
+    \begin{tabular}{lp{3cm}p{4cm}p{4cm}}
+        \toprule
+        \textbf{Modality} & \textbf{Mathematical Source} & \textbf{Reconstruction Difficulty} & \textbf{Forensic Impact} \\
+        \midrule
+        Low-Photon Count & Poisson Noise & Stochastic intensity variation & Loss of skin texture \\
+        Long Exposure & Motion Blur & Convolutional shift & Erases geometric anchors \\
+        High ISO & Gaussian Noise & Additive stochastic artifacts & Obscures identity cues \\
+        Dynamic Shadow & Non-linear Gamma & Manifold distortion & Failure of global filters \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Discussion on Degradation Synergy:} As observed in Table \ref{tab:degradation_impact}, the interaction between these modalities is non-linear. For instance, motion blur combined with Poisson noise makes the identification of eye-centers almost impossible for standard CNNs. Our proposed ANFIS module specifically targets the "Dynamic Shadow" component, providing a localized enhancement map that prevents the noise amplification typically seen in global enhancement methods.
+
+\section{Evolution of Facial Restoration Paradigms}
+The field of facial image restoration has evolved through several distinct paradigms, moving from purely mathematical interpolations to highly complex generative models. This section synthesizes the state-of-the-art research, highlighting the technological "jumps" that inform the proposed ANFIS-LLFSR architecture.
+
+\subsection{The Pre-Deep Learning Era: From Bilinear to Sparse Coding}
+Early work in super-resolution relied on interpolation-based methods such as Bilinear and Bicubic upsampling. While computationally efficient, these methods act as low-pass filters, resulting in blurry edges. The first major shift occurred with \textit{Dictionary Learning} and \textit{Sparse Representation}. Yang et al. \cite{yang2010image} proposed that facial patches could be represented as sparse linear combinations of atoms from a coupled dictionary. This era established the importance of "local priors"—the idea that an eye patch should be reconstructed using an "eye dictionary." However, these methods remained computationally heavy and sensitive to the non-linear noise common in low-light environments.
+
+\subsection{The CNN Revolution: Learning End-to-End Mappings}
+The emergence of Convolutional Neural Networks (CNNs) in 2014 (SRCNN) transformed the field. By treating restoration as a regression problem, CNNs learned to map LR pixels to HR pixels directly. However, early CNNs focused on Mean Squared Error (MSE) optimization, which resulted in "blurry" averages of all possible sharp outputs. This led to the development of \textit{Perceptual Loss} (VGG-based), which encouraged models to match deep feature statistics rather than pixel values. While a significant improvement, CNNs struggled with the "Illumination Ambiguity" of dark images, often amplifying noise while trying to boost brightness.
+
+\subsection{Generative Facial Priors and the Identity Drift Paradox}
+To recover the high-frequency textures (hair, skin pores) lost in low-light, Generative Adversarial Networks (GANs) such as GFPGAN \cite{wang2021towards} and CodeFormer \cite{zhou2022codeformer} were developed. These models utilize "Generative Facial Priors" (GFP)—pre-trained knowledge from large-scale face generators. While visually stunning, these models face a critical "Identity Drift" paradox: as the model "hallucinates" realistic details to make the face look "pretty," it often drifts away from the subject's actual identity. In forensic contexts, a sharp face that doesn't belong to the suspect is a failure. This realization is what led to our integration of the ArcFace sentinel.
+
+\subsubsection{Identity Preservation Theory: The Role of ArcFace}
+The transition from classical sparse representation to identity-anchored deep learning represents the most significant shift in modern face restoration. While sparse coding provides structural consistency, it lacks the "global identity awareness" required for forensic applications. This gap is bridged by state-of-the-art loss functions such as ArcFace.
+
+\subsection{Additive Angular Margin Loss: Mathematical Intuition}
+A critical novelty of our framework is the use of ArcFace embeddings to anchor the hallucination process. Unlike standard Euclidean distances, ArcFace operates on a hyperspherical manifold.
+
+\subsection{Additive Angular Margin Loss}
+Unlike standard Softmax loss, which only ensures feature separability, ArcFace introduces an additive angular margin to maximize intra-class compactness and inter-class discrepancy. This creates a hyperspherical embedding space where facial identity is represented as a high-dimensional vector.
+
+\subsection{ArcFace as a Geometric Sentinel}
+In our pipeline, the ArcFace loss acts as a sentinel. If the LCR hallucination or Swin refinement begins to "drift" toward a generic face, the ArcFace gradient pulls the features back toward the original subject's embedding. This ensures that the restored face is not just "a face" but "the same face" as the input.
+
+\subsubsection{Locality Constraints in Face Restoration}
+Face images exhibit high structural correlation. Unlike natural textures, the "dictionary" of human faces is relatively constrained. LCR leverages this by ensuring that an LR patch of an eye is reconstructed only using HR eye patches from the dictionary, rather than generic edges. This spatial locality is critical for avoiding artifacts like "eye-in-mouth" hallucinations often seen in unconstrained GANs.
+
+\subsection{Deep Learning and CNN-based Approaches}
+The emergence of Convolutional Neural Networks (CNNs) revolutionized SR. Models like SRCNN and VDSR demonstrated that end-to-end mapping could significantly outperform sparse coding. For low-light enhancement, Zero-DCE \cite{li2020zero} introduced a zero-reference learning framework that predicts pixel-wise enhancement curves, avoiding the need for paired datasets.
+
+\subsubsection{Evolution of Loss Functions}
+The transition from Mean Squared Error (MSE) to perceptual losses (VGG loss) and adversarial losses (GAN loss) has been pivotal. While MSE ensures pixel-wise fidelity, it often results in "blurry" outputs because it averages the possible high-frequency solutions. Perceptual losses encourage the model to match deep feature statistics, leading to sharper results.
+
+\subsection{GANs and Generative Facial Priors}
+To recover high-frequency textures, Generative Adversarial Networks (GANs) such as ESRGAN and GFPGAN \cite{wang2021towards} were developed. These models use a discriminator to encourage the generator to produce "real-looking" textures. GFPGAN, in particular, introduced the concept of "Generative Facial Priors" by leveraging pre-trained GAN models (like StyleGAN) as a structured latent space for restoration.
+
+\subsubsection{The Problem of Identity Drift in GANs}
+Despite their visual prowess, GANs often suffer from "identity drift" or "mode collapse." In face restoration, this means the generated face might look like a real person, but not the \textit{correct} person. This is especially problematic in legal and forensic contexts where the accuracy of the subject's identity is paramount.
+
+\subsection{Transformer-based Restoration}
+Recent advancements in Vision Transformers (ViT) have led to architectures like SwinIR \cite{liang2021swinir}, which leverages shifted-window self-attention to capture long-range spatial dependencies. Transformers provide a superior capacity for global context modeling compared to local CNNs, making them ideal for structured objects like faces.
+
+\subsection{Neuro-Fuzzy Systems in Image Processing}
+Fuzzy logic provides a mathematical framework for handling "vagueness" and uncertainty. The Adaptive Neuro-Fuzzy Inference System (ANFIS) \cite{jang1993anfis} combines the interpretability of fuzzy rules with the learning capability of neural networks. 
+
+\subsubsection{Jang (1993): The ANFIS Foundation}
+The seminal work by Jang \cite{jang1993anfis} introduced the architecture that we utilize in this project. Jang proposed a 5-layer network where the first layer performs fuzzification, the second and third layers calculate normalized rule firing strengths, the fourth layer implements Takagi-Sugeno linear consequents, and the fifth layer produces a crisp output. The hybrid learning rule, which combines gradient descent and least-squares estimation, remains one of the most efficient ways to train neuro-fuzzy systems. Our implementation adapts this architecture for the specific task of illumination feature modeling.
+
+\subsubsection{Evolution of Fuzzy Enhancement}
+Prior to ANFIS, fuzzy image enhancement relied on manually defined membership functions and heuristic rules. The introduction of adaptive learning allowed these systems to "learn" the optimal illumination curves from data. In low-light SR, fuzzy logic is particularly effective because "darkness" is a relative concept; a pixel that is considered dark in a daytime image might be considered well-lit in a night-time capture. ANFIS allows us to model this linguistic ambiguity mathematically.
+
+\subsection{State-of-the-Art Face Restoration Models}
+This section provides a deep dive into the models that serve as the technical benchmarks for our work.
+
+\subsubsection{GFPGAN: Generative Facial Prior}
+Wang et al. \cite{wang2021towards} introduced GFPGAN, which utilizes a pre-trained StyleGAN-2 model as a prior. The core idea is to project a degraded face into the rich, high-fidelity latent space of StyleGAN. While GFPGAN produces stunning visual results, it often lacks fine-grained control over identity and can produce "hallucinated" features that are inconsistent with the original subject in extremely low-light cases.
+
+\subsubsection{CodeFormer: Discrete Codebook Priors}
+Zhou et al. \cite{zhou2022codeformer} moved away from continuous latent spaces toward a discrete codebook lookup. By quantizing facial features into a set of "prototypical" patches, CodeFormer achieves remarkable robustness to heavy degradations. However, the quantization process can sometimes lead to a "cartoonish" appearance or a loss of subject-specific micro-textures (like specific moles or wrinkles).
+
+\subsubsection{SwinIR: Transformer-based Restoration}
+Liang et al. \cite{liang2021swinir} demonstrated that the Swin Transformer, with its shifted-window attention, is superior to CNNs for image restoration. By modeling the image as a sequence of patches and calculating self-attention between them, SwinIR can capture the global structural dependencies (e.g., the symmetry between the left and right eyes) that CNNs often miss. Our refinement network builds upon this transformer backbone.
+
+\section{Summary of Literature and Research Positioning}
+Table \ref{tab:literature_summary} summarizes the evolution of face restoration techniques and positions our proposed ANFIS-LLFSR within the current research landscape.
+
+\subsection{Comprehensive Literature Review Table}
+To provide a rigorous benchmark, Table \ref{tab:detailed_lit} provides an exhaustive comparison of foundational and state-of-the-art methods in the domain of facial restoration and low-light enhancement.
+
+\begin{table}[htbp]
+    \centering
+    \scriptsize
+    \caption{Exhaustive Literature Review of Image Restoration Paradigms (2010--2024).}
+    \label{tab:detailed_lit}
+    \begin{tabular}{lp{1.5cm}p{2.5cm}p{3cm}p{3cm}}
+        \toprule
+        \textbf{Author/Year} & \textbf{Method} & \textbf{Key Innovation} & \textbf{Strengths} & \textbf{Limitations} \\
+        \midrule
+        Yang et al. (2010) & ScSR & Sparse representation with coupled dictionaries. & Established patch-based sparse priors. & High reconstruction time; noise-sensitive. \\
+        Dong et al. (2014) & SRCNN & First end-to-end CNN for super-resolution. & Significant PSNR improvement over bicubic. & Shallow architecture; smooths fine textures. \\
+        Jang et al. (1993) & ANFIS & Hybrid neuro-fuzzy inference system. & Interpretable decision boundaries. & Computationally heavy for high-dim inputs. \\
+        Wang et al. (2018) & ESRGAN & Residual-in-Residual Dense Blocks (RRDB). & High perceptual realism; removes blur. & Prone to generative artifacts/hallucinations. \\
+        Li et al. (2020) & Zero-DCE & Zero-reference enhancement curves. & No paired data required; real-time speed. & Limited to illumination; no super-resolution. \\
+        Wang et al. (2021) & GFPGAN & Generative Facial Prior via StyleGAN. & Exceptional texture recovery for eyes/teeth. & Identity drift in extreme low-light. \\
+        Liang et al. (2021) & SwinIR & Shifted-window vision transformer. & Captures long-range dependencies. & Memory intensive for high resolutions. \\
+        Zhou et al. (2022) & CodeFormer & Discrete codebook-based lookup. & Highly robust to severe degradation. & Can produce "average" faces; loses subject identity. \\
+        \midrule
+        \textbf{Proposed (2024)} & \textbf{ANFIS-LLFSR} & \textbf{Neuro-Fuzzy Guided LCR-Swin Hybrid} & \textbf{Identity-anchored; Interpretable illumination modulation} & \textbf{Multi-stage pipeline latency} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\textbf{Interpretation of Research Evolution:} The trends shown in Table \ref{tab:detailed_lit} highlight a move from "reconstruction-based" (PSNR-optimized) to "representation-based" (Identity-optimized) models. While GFPGAN and CodeFormer offer high realism, they often operate as "black boxes" regarding illumination adjustment. Our proposed ANFIS-LLFSR positioning leverages the interpretable rules of ANFIS (from 1993) and the high-capacity transformers (from 2021) to provide a "Fuzzy-Transformer" hybrid that addresses the limitations of both.
+
+\subsection{Research Gap Identification}
+Despite the visual prowess of modern GANs, three critical gaps remain:
+\begin{enumerate}
+    \item \textbf{Illumination Interpretability:} Most deep models treat darkness as a generic feature. There is a lack of explicit, interpretable logic for how much enhancement is applied to specific shadowed vs. well-lit regions.
+    \item \textbf{Structure-Identity Decoupling:} Current models often lose the subject's structural "anchor points" (eye shape, nasal bridge) when performing high-factor upsampling (4x/8x) in low-light.
+    \item \textbf{Generative Hallucination Risks:} In security deployments, the "unconstrained hallucination" of GANs can lead to false positives in biometric matching.
+\end{enumerate}
+
+By combining the interpretability of ANFIS with the hallucination power of LCR and the refinement capacity of Swin Transformers, we propose a "third-way" that avoids the identity drift of GANs while providing higher quality than classical sparse coding.
+
+\section{Problem Statement and Research Questions}
+Given a low-resolution, low-light, and potentially blurry facial image $I_{LR}$, the objective is to reconstruct a high-resolution, identity-consistent, and perceptually realistic facial image $I_{HR}$ such that the following objective function is minimized:
+\begin{equation}
+    \min_{\Theta} \|I_{HR} - \mathcal{F}(I_{LR}, \Theta)\|^2 + \lambda_{ID} \mathcal{L}_{ArcFace}(I_{HR}, I_{GT})
+    \label{eq:total_min}
+\end{equation}
+
+\textbf{Equation Interpretation and Parameter Definitions:} In Equation \ref{eq:total_min}, the first term represents the pixel-wise fidelity constraint, ensuring that the reconstructed face $I_{HR}$ does not deviate spatially from the input structure. The second term, weighted by the penalty coefficient $\lambda_{ID}$, represents the angular margin loss. Here, $I_{GT}$ is the Ground Truth high-resolution image used during training. The choice of $\lambda_{ID}$ is critical; a value too low allows identity drift, while a value too high can lead to "face-flattening" where the model over-prioritizes identity embeddings at the expense of realistic texture.
+
+\subsection{Research Questions (RQ)}
+To guide this investigation, we formulate the following research questions:
+\begin{itemize}
+    \item \textbf{RQ1:} To what extent can an interpretable neuro-fuzzy system improve the localization of shadowed facial regions compared to black-box CNN enhancement?
+    \item \textbf{RQ2:} How does the integration of a locality-constrained dictionary (LCR) mitigate the generative hallucinations typically observed in GAN-based face restoration?
+    \item \textbf{RQ3:} Can the synergistic combination of transformer-based global context and wavelet-frequency fusion preserve the subject's identity embeddings (ArcFace) under severe Poisson-Gaussian noise?
+\end{itemize}
+
+\section{Project Scope and Boundries}
+Defining the operational limits of the proposed system is crucial for its evaluation. Table \ref{tab:scope} delineates the technical boundaries of the ANFIS-LLFSR project.
+
+\begin{table}[htbp]
+    \centering
+    \caption{In-Scope vs. Out-of-Scope Technical Features.}
+    \label{tab:scope}
+    \begin{tabular}{lp{5cm}p{5cm}}
+        \toprule
+        \textbf{Category} & \textbf{In-Scope} & \textbf{Out-of-Scope} \\
+        \midrule
+        Input Format & Static images, 512x512 max res. & High-res 4K video streams. \\
+        Degradation & Low-light, Blur, ISO Noise. & Heavy rain, fog, or snow occlusion. \\
+        Hardware & Single GPU workstations (RTX 30 series). & Real-time mobile SoC deployment. \\
+        Demographics & CelebA-HQ diversity (Pose/Age). & Extreme profiles (> 60 degrees rotation). \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section{Ethical Considerations and Privacy}
+The restoration of facial images from surveillance footage raises significant ethical and privacy concerns. 
+
+\subsection{Consent and Data Privacy}
+The use of datasets like CelebA-HQ, while standard in academic research, involves the processing of biometric data. In real-world deployments, LLFSR systems must comply with data protection regulations such as the GDPR (General Data Protection Regulation). This includes ensuring that facial data is processed only for authorized security purposes and that appropriate encryption is applied to stored embeddings.
+
+\subsection{Mitigating Bias and Fairness}
+A well-documented issue in face recognition is the "algorithmic bias" against certain demographics. In the context of super-resolution, this bias can manifest as "whitewashing" or the erasure of ethnic-specific facial features during hallucination. Our framework addresses this by using a diverse dictionary and an identity-preserving sentinel (ArcFace), which has been shown to be more robust to demographic variations compared to generic GAN priors.
+
+\section{Evolution of Attention Mechanisms in Computer Vision}
+The transition from local convolutions to global attention has been a defining trend in the last decade.
+
+\subsection{Channel Attention and Squeeze-and-Excitation}
+Early attention modules, such as SE-Net, focused on recalibrating channel-wise feature responses. This allowed the network to "ignore" noisy channels and focus on those containing structural information.
+
+\subsection{Spatial Attention and Non-Local Networks}
+Non-local networks introduced the ability to calculate dependencies between distant pixels. For faces, this is crucial for maintaining symmetry (e.g., ensuring the left eye matches the right eye).
+
+\subsection{Shifted-Window Attention (Swin)}
+The Swin Transformer optimizes this by calculating attention within local windows but "shifting" these windows in successive layers. This provides the efficiency of local convolutions with the global modeling power of self-attention. Our SwinFuzzyLCR model leverages this to recover structured facial patterns from blurry inputs.
+
+\section{Historical Overview of Fuzzy Logic in Image Processing}
+The roots of fuzzy logic trace back to the pioneering work of Lotfi Zadeh in 1965. In the context of computer vision, fuzzy sets provided a robust mathematical framework for handling the ambiguity inherent in pixel intensity values.
+
+\subsection{Early Fuzzy Filtering}
+In the 1990s, fuzzy filters were primarily used for noise removal. Unlike linear filters, which often blur edges, fuzzy filters used "IF-THEN" rules to identify whether a pixel was part of a sharp edge or a noisy artifact.
+
+\subsection{Emergence of Neuro-Fuzzy Systems}
+The integration of neural networks and fuzzy logic (Neuro-Fuzzy) allowed for the automated learning of membership functions. Jang's ANFIS (Adaptive Neuro-Fuzzy Inference System) became the gold standard, providing a way to model complex non-linear mappings while maintaining the interpretability of fuzzy rules.
+
+\subsection{Fuzzy Logic in the Deep Learning Era}
+While deep learning has dominated the last decade, recent research has revisited fuzzy logic to provide "soft" decision boundaries for neural features. Our work follows this trend by using ANFIS as a high-level controller for deep transformer blocks, bridging the gap between symbolic reasoning and connectionist learning.
+
+\section{Evolution of Image Quality Assessment (IQA) Metrics}
+Measuring the success of restoration algorithms has evolved from simple pixel-wise differences to deep perceptual models.
+
+\subsection{Pixel-Based Metrics: PSNR and MSE}
+Peak Signal-to-Noise Ratio (PSNR) and Mean Squared Error (MSE) were the earliest metrics. While they provide a clear mathematical measure of reconstruction fidelity, they correlate poorly with human perception. A slightly shifted image can have a very low PSNR despite being visually identical to the ground truth.
+
+\subsection{Structural Metrics: SSIM}
+The Structural Similarity Index Measure (SSIM) was a breakthrough, as it considers local patterns of pixel intensities. It captures changes in structural information, luminance, and contrast, aligning more closely with the human visual system (HVS).
+
+\subsection{Deep Perceptual Metrics: LPIPS}
+Learned Perceptual Image Patch Similarity (LPIPS) uses the internal activations of pre-trained deep networks (like VGG or AlexNet) to measure similarity. This metric is currently the most robust for evaluating generative models, as it captures "perceptual" realism better than any hand-crafted formula.
+
+\section{Organization of Thesis}
+The remainder of this thesis is organized as follows:
+\begin{itemize}
+    \item \textbf{Chapter 2: Mathematical Modeling and Methods} details the technical architecture of the ANFIS-LLFSR system, including the derivations of fuzzy rules and the deep refinement pipeline.
+    \item \textbf{Chapter 3: Results and Discussion} provides a comprehensive experimental evaluation using the CelebA dataset and comparative analysis with SOTA benchmarks.
+    \item \textbf{Chapter 4: Conclusion and Future Work} summarizes the contributions and outlines future research directions.
+\end{itemize}

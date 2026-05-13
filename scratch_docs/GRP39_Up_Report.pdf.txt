@@ -1,0 +1,748 @@
+
+--- Page 1 ---
+Neuro-Fuzzy Inferencing Based Low-Light Face
+Super-Resolution System
+A project report submitted in partial fulfillment of the requirements for the degree of
+B.Tech in Computer Science and Engineering
+By
+Huzaifa Mulla 2022UCS1510
+Dhruv Kumar Sharma 2022UCD2138
+Mohammed Afnan Mohiuddin 2022UCA1821
+Under the supervision of
+Dr. Ankush Jain
+Associate Professor, Dept. CSE, NSUT Delhi
+Netaji Subhas University of Technology (NSUT), Delhi
+--- Page 2 ---
+CERTIFICATE
+This is to certify that the project titledIdentity-Constrained Face Super-Resolution
+in Low-Light Conditions Using Dual Geometric and Feature Supervisionis a bonafide
+record of the work done by
+Huzaifa Mulla (2022UCS1510)
+Dhruv Kumar Sharma (2022UCD2138)
+Mohammed Afnan Mohiuddin (2022UCA1821)
+under my supervision and guidance in partial fulfillment of the requirements for the
+award of the degree ofBachelor of Engineering in Information Technologyof theNetaji
+Subhas Institute of Technology, University of Delhi, DELHI-110078, during the year
+2025–2026.
+Their work is genuine and has not been submitted for the award of any other degree to
+the best of my knowledge.
+DATE: 11 MAY 2026
+Dr. Ankush Jain
+Associate Professor
+Department of computer science and engineering
+Netaji Subhas Institute of Technology
+University of Delhi
+--- Page 3 ---
+CANDIDATE(S) DECLARATION
+DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING
+I/We,Huzaifa Mulla (2022UCS1510),Dhruv Kumar Sharma (2022UCD2138)and
+Mohammed Afnan Mohiuddin (2022UCA1821)of B. Tech. Department of Computer
+Science & Engineering, hereby declare that the Project-Thesis titled
+“Neuro-Fuzzy Inferencing Based Low-Light Face Super-Resolution System
+using Locality Constrained Representation”
+which is submitted by me/us to the Department of Computer Science & Engineering,
+Netaji Subhas University of Technology (NSUT) Dwarka, New Delhi in partial fulfillment
+of the requirement for the award of the degree of Bachelor of Technology is original and
+not copied from any source without proper citation. The manuscript has been subjected to
+plagiarism check by Turnitin software. This work has not previously formed the basis for
+the award of any Degree.
+DATE: 11MAY 2026
+Huzaifa Mulla Dhruv Kumar Sharma Mohammed Afnan Mohiuddin
+2022UCS1510 2022UCD2138 2022UCA1821
+--- Page 4 ---
+CERTIFICATE OF DECLARATION
+DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING
+This is to certify that the Project-Thesis titled“Neuro-Fuzzy Inferencing Based
+Low-Light Face Super-Resolution System using Locality Constrained
+Representation”,
+which is being submitted byHuzaifa Mulla (2019UCS1234),Dhruv Kumar Sharma
+(2019UCS1234)andMohammed Afnan Mohiuddin (2019UCS1234)
+to the Department of Computer Science & Engineering, Netaji Subhas University of
+Technology (NSUT) Dwarka, New Delhi in partial fulfillment of the requirement for the
+award of the degree of Bachelor of Technology, is a record of the thesis work carried out
+by the students under my supervision and guidance. The content of this thesis, in full or in
+parts, has not been submitted for any other degree or diploma.
+DATE: 11MAY 2026
+Dr. Ankush Jain
+(Assistant Professor)
+Department of Computer Science & Engineering
+Netaji Subhas University of Technology
+--- Page 5 ---
+ACKNOWLEDGEMENT
+We would like to express our sincere gratitude and appreciation to all those who
+contributed to the successful completion of this project. Special thanks to our project
+supervisor,Dr. Ankush Jain, whose guidance, valuable suggestions, encouragement, and
+continuous support greatly helped us throughout the development and documentation of
+this research work.also sincerely thank the faculty members and staff of the Department of
+Computer Science & Engineering for providing us with the necessary facilities, technical
+resources, and academic environment required for completing this project
+successfully.would also like to thank our friends and colleagues for their support,
+motivation, and valuable feedback during the implementation and report preparation
+phases of the project.
+Huzaifa Mulla Dhruv Kumar Sharma Mohammed Afnan Mohiuddin
+2019UCS1234 2019UCS1234 2019UCS1234
+--- Page 6 ---
+Abstract
+Low-light face image super-resolution is an important research area in computer
+vision because facial images captured under poor illumination conditions often suffer
+from blur, noise, low contrast, and loss of important facial details. These degradations
+reduce the performance of surveillance systems, biometric authentication frameworks,
+and face recognition applications. Conventional interpolation and enhancement meth-
+ods generally fail to reconstruct realistic high-frequency facial textures and identity-
+preserving information.
+This research proposes a Neuro-Fuzzy Inferencing Based Low-Light Face Super-
+Resolution System that combines Adaptive Neuro-Fuzzy Inference Systems (ANFIS),
+locality constrained representation, motion blur correction, regression-based recon-
+struction, and deep neural refinement techniques to improve low-light facial image
+quality. The framework first estimates the darkness level of the image using ANFIS-
+based adaptive learning. Based on the estimated illumination conditions, adaptive
+enhancement and motion blur correction techniques are applied to improve visibility
+and restore structural consistency.
+The enhanced image is then processed using locality constrained dictionary repre-
+sentation and regression-based patch reconstruction methods in order to recover im-
+portant facial textures and high-resolution details. Finally, RRDB-based neural refine-
+ment modules improve perceptual quality and generate sharper facial outputs while
+preserving identity-related features.
+The proposed system is implemented using Python, PyTorch, OpenCV , and scikit-
+fuzzy, while the CelebA dataset is used for training and evaluation. Experimental
+evaluation using PSNR, SSIM, LPIPS, and face identity preservation metrics demon-
+strates that the proposed framework significantly improves reconstruction quality and
+perceptual realism compared to traditional enhancement and interpolation approaches.
+Keywords:Low-Light Face Super-Resolution, Adaptive Neuro-Fuzzy Inference Sys-
+tem (ANFIS), Locality Constrained Representation, Motion Blur Correction, Facial
+Image Enhancement, Deep Learning, RRDB, Face Restoration.
+1
+--- Page 7 ---
+List of Figures
+Figure 1 Complete system architecture showing the frontend, backend API,
+and the five-stage restoration pipeline. . . . . . . . . . . . . . . . . . . . . 8
+Figure 2 End-to-end inference pipeline used in ANFIS-LLFSR. . . . . . . . . 9
+Figure 3 Five-layer ANFIS architecture used for darkness estimation. . . . . 11
+Figure 4 Training pipeline showing data preparation and hybrid ANFIS opti-
+mization. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+Figure 5 Ablation study results. Each row removes one module from the
+full pipeline. Face recognition accuracy drops most dramatically when the
+ArcFace sentinel is removed. . . . . . . . . . . . . . . . . . . . . . . . . . 15
+Figure 6 Four-stage comparison showing LR input, bicubic interpolation,
+ANFIS-LCR reconstruction, and ground truth reference image. . . . . . . . 16
+Figure 7 Visual reconstruction comparison under low-light facial degradation
+conditions. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+Figure 8 Comparison of reconstruction quality using bicubic interpolation
+and ANFIS-LCR enhancement. . . . . . . . . . . . . . . . . . . . . . . . . 17
+Figure 9 Visual comparison showing illumination enhancement and detail
+reconstruction performance. . . . . . . . . . . . . . . . . . . . . . . . . . 17
+Figure 10 Reconstruction results obtained under compound low-light and blur
+degradation. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17
+Figure 11 Intermediate outputs showing fuzzy-attention enhancement, super-
+resolution reconstruction, and FFT spectrum visualization. . . . . . . . . . 18
+Figure 12 Five-stage reconstruction pipeline showing gradual image enhance-
+ment and restoration. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+Figure 13 Pipeline visualization demonstrating enhancement and reconstruc-
+tion stages under low-light degradation. . . . . . . . . . . . . . . . . . . . 19
+Figure 14 Visual representation of intermediate restoration stages and corre-
+sponding frequency spectrum analysis. . . . . . . . . . . . . . . . . . . . . 19
+2
+--- Page 8 ---
+List of Tables
+Table 1 Quantitative comparison on the CelebA dataset. . . . . . . . . . . . . 15
+Table 2 Technology stack used in ANFIS-LLFSR. . . . . . . . . . . . . . . . 20
+3
+--- Page 9 ---
+Contents
+1 INTRODUCTION 5
+1.1 Objectives . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+2 LITERATURE SURVEY 6
+2.1 ANFIS for Illumination Estimation . . . . . . . . . . . . . . . . . . . . . . 7
+2.2 Zero-DCE . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.3 SwinIR . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.4 ArcFace . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+3 OBJECTIVE AND METHODOLOGY 7
+3.1 System Architecture . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+3.1.1 Frontend . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+3.1.2 Backend API . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+3.1.3 Pipeline Overview . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+3.2 Core Components and Mathematical Formulation . . . . . . . . . . . . . . 10
+3.2.1 Adaptive Neuro-Fuzzy Inference System . . . . . . . . . . . . . . 10
+3.3 Feature Extraction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+3.4 Gaussian Membership Function . . . . . . . . . . . . . . . . . . . . . . . 11
+3.5 Rule Strength . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+3.6 Normalisation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+3.7 Defuzzification . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+3.7.1 Motion Blur Detection . . . . . . . . . . . . . . . . . . . . . . . . 12
+3.7.2 Zero-DCE Enhancement . . . . . . . . . . . . . . . . . . . . . . . 12
+3.7.3 Spatial Feature Transform . . . . . . . . . . . . . . . . . . . . . . 12
+4 SIMULATION PLATFORM AND REQUIREMENTS 13
+4.1 Training Methodology . . . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+4.1.1 Dataset Preparation . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+4.1.2 Training Details . . . . . . . . . . . . . . . . . . . . . . . . . . . . 13
+4.1.3 Fine-Tuning . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+5 RESULTS AND EV ALUATION 14
+5.1 Evaluation Metrics . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+5.2 Quantitative Results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15
+5.3 Four-Stage Visual Reconstruction Results . . . . . . . . . . . . . . . . . . 15
+5.4 Five-Stage Intermediate Pipeline Results . . . . . . . . . . . . . . . . . . . 18
+5.5 Analysis . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
+5.6 Implementation Details . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+5.6.1 Technology Stack . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+5.6.2 Testing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
+6 CONCLUSION 21
+6.1 Conclusion . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+6.2 Future Work . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+4
+--- Page 10 ---
+1 INTRODUCTION
+Nowadays, cameras are used almost everywhere, including surveillance systems, smart-
+phones, traffic cameras, and body-worn devices. A common problem with these systems is
+that images captured in low-light conditions usually lose important facial details. In many
+cases, the images are also blurry or low in resolution, which makes the restoration process
+even harder.
+In image restoration, the degraded image can be represented mathematically using Eq.
+(1).
+y=D(k∗x) +n(1)
+Here,xrepresents the original image,kis the blur kernel,Drepresents downsampling,
+andnrefers to noise added during image capture.
+Recovering the original face image from this degraded version is not simple because
+multiple types of degradation happen together. Traditional image restoration methods are
+mathematically stable, but they usually fail to recover realistic facial textures. On the other
+hand, deep learning models such as ESRGAN, GFPGAN, and CodeFormer generate vi-
+sually good results, but they sometimes create incorrect facial features or overly smooth
+outputs.
+In this project, we tried to combine both approaches. The proposed ANFIS-LLFSR
+system uses fuzzy logic together with deep learning to improve low-light face restoration.
+Instead of applying the same enhancement everywhere, the system first estimates how dark
+the image actually is and then adjusts the restoration process accordingly.
+Another issue with low-light face images is that many enhancement methods focus only
+on increasing brightness. While this improves visibility, it often creates unnatural outputs
+where the image looks overexposed or noisy. In face restoration tasks, preserving facial
+structure is more important than simply increasing illumination.
+Face images also contain very sensitive identity-related features. Small distortions
+around the eyes, nose, or mouth can completely change the appearance of a person. Be-
+cause of this, restoration models need to improve image quality while still maintaining
+facial consistency.
+Real-world low-light conditions are also highly unpredictable. Some images may con-
+tain motion blur due to camera movement, while others may suffer from compression arti-
+facts or sensor noise. A practical restoration framework should therefore be able to handle
+multiple degradation types together instead of focusing on only one problem.
+This project attempts to address these issues using a combination of fuzzy logic, en-
+hancement methods, and deep learning-based reconstruction techniques.
+Another reason why low-light restoration has become important is the increasing use of
+AI-based surveillance and biometric verification systems. Many of these systems depend
+heavily on clear facial images for identification. When the input image quality becomes
+poor, the accuracy of these systems decreases significantly.
+In practical situations, cameras often operate under uncontrolled lighting conditions.
+Street lights, shadows, weather conditions, and camera quality all affect the captured image.
+Because of this, a restoration model trained only on ideal datasets may not perform properly
+5
+--- Page 11 ---
+in real environments.
+The proposed framework was designed while keeping these real-world challenges in
+mind. Instead of focusing only on visual sharpness, the system also attempts to maintain
+facial identity and structural consistency.
+1.1 Objectives
+The main objectives of this project are listed below:
+1. Build an ANFIS-based darkness estimation module.
+2. Detect and correct motion blur using Wiener deconvolution.
+3. Apply Zero-DCE enhancement using the estimated darkness factor.
+4. Develop an 8×super-resolution network using Swin Transformer blocks.
+5. Preserve facial identity using ArcFace embeddings.
+6. Deploy the complete system using FastAPI and a React frontend.
+2 LITERATURE SURVEY
+Several existing research papers were studied before designing the final pipeline. Each
+paper focused on a different problem related to low-light face restoration.
+Another important observation from previous research was that many super-resolution
+methods perform well only on synthetic datasets. When these models are tested on real
+low-light images, the performance often drops because real-world degradations are more
+complex.
+Some researchers also explored GAN-based approaches for face restoration. These
+methods generated visually sharp images but sometimes introduced artificial textures that
+did not actually belong to the original face. In biometric applications, such distortions can
+become a serious problem.
+Some studies also focused on lightweight enhancement methods for mobile devices.
+These methods reduced computational complexity but often sacrificed output quality. Real-
+time restoration remains difficult because high-quality super-resolution networks usually
+require large memory and processing power.
+Researchers also experimented with transformer-based restoration models because trans-
+formers can capture long-range dependencies more effectively than traditional CNNs. How-
+ever, training transformer models requires large datasets and significant computational re-
+sources.
+These observations helped in selecting a balanced architecture that could provide rea-
+sonable restoration quality without becoming excessively complicated.
+Fuzzy logic systems were studied separately because they provide interpretable decision-
+making instead of black-box predictions. This was one of the main reasons for selecting
+ANFIS in the proposed framework.
+Overall, the literature survey helped identify the strengths and weaknesses of existing
+methods and provided direction for designing the final hybrid architecture.
+6
+--- Page 12 ---
+2.1 ANFIS for Illumination Estimation
+Jang introduced the Adaptive Neuro-Fuzzy Inference System (ANFIS), which combines
+fuzzy logic with neural networks [1]. The idea behind ANFIS is to make learning systems
+more interpretable while still allowing them to adapt during training.
+This concept was useful for our project because low-light enhancement depends heavily
+on estimating image darkness correctly.
+2.2 Zero-DCE
+Zero-DCE is a low-light enhancement model that does not require paired training images
+[2]. Instead of learning from clean target images, it predicts enhancement curves directly
+from the input image.
+This method works well for low-light correction because it focuses on brightness ad-
+justment while preserving image structure.
+2.3 SwinIR
+SwinIR uses Swin Transformer blocks for image restoration tasks [3]. Compared to nor-
+mal convolutional networks, SwinIR captures both local and global image features more
+effectively.
+The shifted-window attention mechanism also reduces computational cost while main-
+taining good restoration quality.
+2.4 ArcFace
+ArcFace introduced additive angular margin loss for face recognition tasks [4]. It produces
+highly discriminative facial embeddings.
+In this project, ArcFace was used to preserve facial identity during restoration so that
+the generated face remains similar to the original person.
+3 OBJECTIVE AND METHODOLOGY
+3.1 System Architecture
+The ANFIS-LLFSR system is divided into three main parts: frontend, backend API, and
+the restoration pipeline.
+The frontend handles image upload and result visualization. The backend controls all
+processing stages and connects the frontend with the deep learning models.
+7
+--- Page 13 ---
+Figure 1:Complete system architecture showing the frontend, backend API, and the five-
+stage restoration pipeline.
+3.1.1 Frontend
+The frontend was built using React 18, TypeScript, Vite, and Tailwind CSS. Users can
+upload images directly through the web interface.
+After processing, the frontend displays intermediate outputs such as blur-corrected im-
+ages, enhanced images, and final super-resolved results.
+The frontend was designed to keep the interface simple and easy to use. Users only need
+to upload an image and start the enhancement process. Intermediate outputs are displayed
+separately so that users can observe how each stage changes the image.
+The interface also helps during debugging because outputs from blur correction, en-
+hancement, and super-resolution can be inspected individually. This made testing easier
+during development.
+Special attention was given to keeping the user interaction simple because the main
+goal of the project was image restoration rather than interface complexity. The frontend
+mainly focuses on usability and quick visualization of results.
+The uploaded images are displayed alongside processed outputs so that differences can
+be compared directly.
+3.1.2 Backend API
+The backend was developed using FastAPI. The following API endpoints were imple-
+mented:
+• GET /api/health
+• POST /api/enhance
+• POST /api/darkness
+8
+--- Page 14 ---
+• POST /api/batch
+The backend handles image decoding, model loading, and output generation.
+FastAPI was selected because it is lightweight and works well with machine learning
+applications. The backend loads all required models during startup so that inference time
+remains low during actual execution.
+Error handling was also added to prevent invalid image uploads and unsupported file
+formats. The API returns processed images in encoded format so that they can be displayed
+directly on the frontend without additional processing.
+The backend also manages model inference efficiently by keeping frequently used com-
+ponents loaded in memory. This reduces repeated initialization overhead during multiple
+image requests.
+Batch processing support was also added so that multiple images could be restored
+together during testing.
+3.1.3 Pipeline Overview
+The complete pipeline works in multiple stages. First, the ANFIS module estimates the
+darkness level of the image. Then blur correction and illumination enhancement are ap-
+plied.
+Finally, the super-resolution network reconstructs high-quality facial details.
+Each stage in the pipeline depends on the output of the previous stage. If blur correction
+is skipped, the super-resolution network may amplify blurry edges instead of restoring
+details properly. Similarly, poor illumination enhancement can reduce texture visibility
+before reconstruction begins.
+Because of this dependency between stages, careful ordering of the pipeline was nec-
+essary during system design.
+The pipeline was also designed in a sequential manner so that intermediate outputs
+could be inspected independently. This helped during experimentation because errors in
+one stage could be identified more easily without affecting the entire system.
+Another advantage of this modular structure is that future improvements can be inte-
+grated more easily. For example, the blur correction stage can later be replaced with a more
+advanced deblurring model without changing the remaining pipeline.
+Figure 2:End-to-end inference pipeline used in ANFIS-LLFSR.
+9
+--- Page 15 ---
+3.2 Core Components and Mathematical Formulation
+3.2.1 Adaptive Neuro-Fuzzy Inference System
+The ANFIS module acts as the main decision-making component of the system. It esti-
+mates how dark the image is before enhancement begins.
+ANFIS was selected mainly because it combines adaptive learning with fuzzy reason-
+ing. Unlike traditional neural networks, fuzzy systems can represent uncertainty more
+naturally using linguistic rules.
+In low-light images, brightness levels do not always change uniformly across the im-
+age. Some regions may already contain enough illumination while other regions remain
+extremely dark. Fuzzy inference helps handle these variations more effectively compared
+to fixed enhancement strategies.
+Another advantage of ANFIS is that the fuzzy rules remain partially interpretable even
+after training. This makes the system easier to analyze compared to completely black-box
+neural networks.
+The adaptive learning capability of ANFIS also helps the system adjust to different
+illumination distributions during optimization.
+3.3 Feature Extraction
+A five-dimensional feature vector is extracted from each image:
+• Mean luminance intensity
+• Standard deviation
+• Entropy
+• Gradient energy
+• FFT high-frequency ratio
+These features help the system understand image brightness, texture quality, and blur
+severity.
+Feature extraction also helps reduce dependence on raw pixel intensity alone. Since
+low-light images can vary significantly depending on camera quality and environment,
+combining statistical and frequency-based features improves robustness.
+The extracted features were normalized before being passed into the ANFIS module to
+maintain stable inference behavior.
+10
+--- Page 16 ---
+Figure 3:Five-layer ANFIS architecture used for darkness estimation.
+3.4 Gaussian Membership Function
+The Gaussian membership function is represented in Eq. (2).
+µi,k(xi) = exp 
+−(xi−ci,k)2
+2σ2
+i,k!
+(2)
+The valuesc i,kandσ i,krepresent the center and width of the membership functions.
+3.5 Rule Strength
+The rule firing strength is calculated using Eq. (3).
+wr=Y
+iµi,ri(xi)(3)
+3.6 Normalisation
+The normalization stage is represented using Eq. (4).
+¯wr=wrP
+jwj(4)
+3.7 Defuzzification
+The final Darkness Factor is obtained using Eq. (5).
+DF=X
+r¯wrfr(x)(5)
+11
+--- Page 17 ---
+3.7.1 Motion Blur Detection
+Motion blur was estimated using Laplacian variance, Sobel gradients, and FFT high-frequency
+analysis.
+If the blur level crossed a threshold, Wiener deconvolution was applied.
+The Wiener filter equation is shown in Eq. (6).
+ˆF(u, v) =H∗(u, v)
+|H(u, v)|2+ 1/SNR·G(u, v)(6)
+Blur detection was necessary because many low-light images are captured using longer
+exposure times. During long exposure capture, even small camera movement can create
+visible blur around facial boundaries.
+Applying super-resolution directly on blurred images usually produces poor results.
+Therefore, blur correction was applied before enhancement and reconstruction stages.
+In low-light photography, motion blur becomes more common because cameras use
+slower shutter speeds to capture additional light. Even small hand movements can introduce
+blur into facial regions.
+This problem becomes more noticeable in surveillance footage where moving subjects
+are captured from long distances.
+3.7.2 Zero-DCE Enhancement
+Zero-DCE predicts enhancement curves for different image regions.
+The enhancement function is represented in Eq. (7).
+LE(I;α) =I+α(I2−I)(7)
+Higher values ofαincrease brightness, while lower values reduce overexposed regions.
+One advantage of Zero-DCE is that it does not require paired low-light and normal-
+light images during training. Collecting perfectly paired datasets is difficult in real-world
+scenarios, so zero-reference enhancement methods become more practical.
+The enhancement curves generated by Zero-DCE also help preserve image smoothness
+while improving brightness gradually.
+Unlike histogram equalization methods, Zero-DCE performs enhancement gradually
+instead of applying global brightness changes. This helps preserve more natural illumina-
+tion patterns across the image.
+The enhancement stage also improves edge visibility, which later helps the super-
+resolution network reconstruct sharper facial structures.
+3.7.3 Spatial Feature Transform
+The SFT layer connects the ANFIS output with the super-resolution network.
+The conditioning operation is shown in Eq. (8).
+SFT(x, c) =x+α(γ(c)⊙x+β(c))⊙g(c)(8)
+This helps the network apply different enhancement strengths based on image darkness.
+12
+--- Page 18 ---
+The SFT layer allows the restoration network to adapt dynamically depending on illu-
+mination conditions. Instead of using the same feature scaling everywhere, the conditioning
+signal modifies feature maps according to image darkness.
+This improves flexibility and helps the network produce more stable outputs under dif-
+ferent lighting conditions.
+4 SIMULATION PLATFORM AND REQUIREMENTS
+4.1 Training Methodology
+Figure 4:Training pipeline showing data preparation and hybrid ANFIS optimization.
+4.1.1 Dataset Preparation
+The CelebA dataset was used for training and evaluation. It contains more than 200,000
+aligned face images.
+For super-resolution training, the images were resized and degraded using synthetic
+low-light transformations and motion blur.
+Gamma correction was applied to simulate dark environments.
+The CelebA dataset was selected because it contains large variations in facial pose,
+lighting conditions, and expressions. These variations make the dataset suitable for training
+robust face restoration models.
+Different degradation levels were applied artificially to simulate realistic low-light con-
+ditions. This helped the model learn restoration under multiple difficulty levels instead of
+memorizing specific degradation patterns.
+4.1.2 Training Details
+The ANFIS module and restoration networks were trained using Adam optimizer.
+The main training settings are listed below:
+• Epochs: 200
+• Batch Size: 1024
+13
+--- Page 19 ---
+• Learning Rate:1×10−3
+• Gradient Clipping: max_norm = 1.0
+The learning rate was reduced gradually during training to improve convergence.
+Training deep learning models for image restoration required significant computational
+resources. GPU acceleration was used during training to reduce execution time and im-
+prove optimization efficiency.
+Different hyperparameter combinations were tested before selecting the final configu-
+ration. Smaller batch sizes produced unstable training results, while very large learning
+rates caused divergence during optimization.
+4.1.3 Fine-Tuning
+Multiple loss functions were combined during end-to-end training.
+The complete loss function is shown in Eq. (9).
+L=λ 1Lsc+λ 2Lexp+λ 3Lcol+λ 4Lis+λ 5Lid+λ 6Llm (9)
+Different weights were used to balance illumination correction, perceptual quality, and
+identity preservation.
+Training stability was monitored continuously during experimentation. In the early
+stages of training, some outputs appeared noisy because the network had not yet learned
+stable feature mappings.
+As training progressed, reconstructed outputs gradually became sharper and more visu-
+ally consistent.
+5 RESULTS AND EV ALUATION
+5.1 Evaluation Metrics
+Different evaluation metrics were used to measure restoration quality.
+• PSNR
+• SSIM
+• LPIPS
+• Face Accuracy
+PSNR and SSIM measure image quality, while LPIPS focuses more on perceptual sim-
+ilarity.
+Face Accuracy was calculated using ArcFace embeddings.
+No single metric is sufficient for evaluating face restoration quality. Some metrics focus
+mainly on pixel similarity, while others evaluate perceptual realism.
+Because of this, multiple evaluation metrics were used together to provide a more bal-
+anced understanding of system performance.
+14
+--- Page 20 ---
+5.2 Quantitative Results
+Table 1:Quantitative comparison on the CelebA dataset.
+Method PSNR SSIM LPIPS Face Accuracy
+Bicubic Baseline 24.12 0.7240 0.3540 45.2
+Zero-DCE + RRDB 26.85 0.7812 0.2810 55.4
+ANFIS-LCR 28.14 0.8250 0.2215 68.1
+ANFIS-LLFSR Full 30.42 0.8541 0.1802 75.8
+The final ANFIS-LLFSR model performed better than the baseline methods across all eval-
+uation metrics.
+The results showed noticeable improvements in both image quality and identity preser-
+vation.
+Figure 5:Ablation study results. Each row removes one module from the full pipeline.
+Face recognition accuracy drops most dramatically when the ArcFace sentinel is removed.
+5.3 Four-Stage Visual Reconstruction Results
+Apart from numerical evaluation metrics, visual comparison was also performed to under-
+stand how well the proposed framework restored facial details under low-light conditions.
+The following results show four-stage reconstruction outputs. Each sample contains:
+• Low-resolution input image
+• Bicubic interpolation result
+• Proposed ANFIS-LCR reconstruction
+• Ground truth reference image
+These comparisons help in understanding the qualitative improvements produced by
+the proposed framework. Compared to bicubic interpolation, the ANFIS-based approach
+was able to recover sharper facial boundaries and better illumination consistency.
+The reconstructed outputs also preserved facial structure more effectively in moderately
+degraded samples.
+15
+--- Page 21 ---
+Visual comparison is important in face restoration tasks because numerical metrics
+alone do not fully represent perceptual quality. In many cases, two methods may produce
+similar PSNR values while generating very different visual outputs.
+The four-stage comparisons clearly show the effect of the proposed reconstruction
+framework under different low-light conditions. The low-resolution inputs contain visi-
+ble blur, poor illumination, and loss of facial detail. Bicubic interpolation slightly improves
+image size but fails to reconstruct meaningful textures around important facial regions such
+as the eyes, mouth, and hair boundaries.
+The proposed ANFIS-LCR framework produces comparatively sharper outputs and im-
+proves illumination consistency across the face. Facial contours appear more stable and
+visually clearer in most examples.
+Another observation from these results is that the enhancement process avoids excessive
+brightness amplification in many cases. This helps maintain more natural-looking outputs
+instead of producing overexposed facial regions.
+Figure 6:Four-stage comparison showing LR input, bicubic interpolation, ANFIS-LCR
+reconstruction, and ground truth reference image.
+Figure 7:Visual reconstruction comparison under low-light facial degradation conditions.
+16
+--- Page 22 ---
+Figure 8:Comparison of reconstruction quality using bicubic interpolation and ANFIS-
+LCR enhancement.
+Figure 9:Visual comparison showing illumination enhancement and detail reconstruction
+performance.
+Figure 10:Reconstruction results obtained under compound low-light and blur degrada-
+tion.
+The visual results show that bicubic interpolation mainly increases image size without
+restoring important facial textures. In comparison, the proposed framework improves facial
+sharpness and illumination while preserving more natural appearance.
+Some distortions are still visible in heavily degraded samples, especially when severe
+blur and low illumination occur together. However, the overall reconstruction quality re-
+mains better than baseline interpolation methods.
+The visual results also suggest that the framework performs better when at least partial
+facial structure remains visible in the input image. Extremely degraded samples still remain
+difficult because some texture information is permanently lost during image capture.
+17
+--- Page 23 ---
+Even in challenging conditions, the reconstructed outputs generally preserve better fa-
+cial consistency compared to traditional interpolation-based methods. This indicates that
+combining enhancement and reconstruction together improves restoration quality more ef-
+fectively than applying only super-resolution independently.
+5.4 Five-Stage Intermediate Pipeline Results
+Additional experiments were performed to observe intermediate outputs generated at dif-
+ferent stages of the pipeline.
+These results help visualize how the image changes throughout the restoration process.
+Each figure contains:
+• Input low-resolution image
+• Fuzzy-attention stage output
+• Enhanced image
+• Final super-resolution output
+• Ground truth reference image
+• FFT spectrum visualization
+The intermediate outputs provide better understanding of how each module contributes
+to the final reconstruction quality.
+The fuzzy-attention stage mainly improves illumination consistency, while the enhance-
+ment stage increases visibility and edge clarity. Finally, the super-resolution network re-
+constructs sharper facial details.
+The intermediate pipeline visualizations provide a better understanding of how different
+modules contribute to the final restored image. Instead of observing only the final output,
+these comparisons allow stage-wise analysis of enhancement and reconstruction behavior.
+The fuzzy-attention stage mainly focuses on improving illumination distribution and
+highlighting important facial regions. After this stage, the enhancement module increases
+visibility and improves edge contrast. The final super-resolution network then reconstructs
+higher-frequency facial details and texture information.
+The FFT spectrum visualizations were also included to observe frequency-domain be-
+havior during reconstruction. Low-light and blurry images usually contain weaker high-
+frequency components. After enhancement and super-resolution, stronger frequency pat-
+terns become visible in the FFT outputs, indicating improved texture recovery.
+Figure 11:Intermediate outputs showing fuzzy-attention enhancement, super-resolution
+reconstruction, and FFT spectrum visualization.
+18
+--- Page 24 ---
+Figure 12:Five-stage reconstruction pipeline showing gradual image enhancement and
+restoration.
+Figure 13:Pipeline visualization demonstrating enhancement and reconstruction stages
+under low-light degradation.
+Figure 14:Visual representation of intermediate restoration stages and corresponding fre-
+quency spectrum analysis.
+The FFT spectrum images help visualize frequency-domain characteristics during en-
+hancement. Higher-frequency components become more visible after reconstruction, indi-
+cating improved texture recovery.
+The final outputs appear sharper and clearer compared to the original low-resolution in-
+puts. These results suggest that the proposed multi-stage pipeline improves both perceptual
+quality and structural consistency.
+Another important observation from these results is that gradual multi-stage enhance-
+ment produces more stable outputs compared to applying aggressive restoration in a single
+step. Each module contributes small improvements which together produce a clearer final
+reconstruction.
+The intermediate outputs also help explain why the proposed pipeline performs better
+under difficult lighting conditions. By separating enhancement, blur correction, and recon-
+struction into different stages, the framework is able to process degraded facial features
+more effectively.
+5.5 Analysis
+The ablation study helped show how each module affected the final output.
+19
+--- Page 25 ---
+Removing the ANFIS darkness estimator reduced PSNR significantly, which suggests
+that proper darkness estimation plays an important role in low-light enhancement.
+Similarly, removing the ArcFace identity module reduced face recognition accuracy.
+This means that identity preservation is important during face restoration tasks.
+Overall, combining fuzzy logic with deep learning improved both visual quality and
+facial consistency.
+The system performed especially well for moderately degraded images where important
+facial structures were still partially visible. In such cases, the enhancement and reconstruc-
+tion stages were able to recover realistic details effectively.
+Performance decreased slightly for extremely dark images because severe illumination
+loss removes a large amount of texture information before restoration even begins.
+The results suggest that combining enhancement and reconstruction stages together
+produces better outputs than applying only super-resolution independently. Proper illumi-
+nation correction before reconstruction helped improve texture visibility significantly.
+The fuzzy-guided conditioning strategy also helped reduce unnecessary over-enhancement
+in moderately bright images.
+5.6 Implementation Details
+5.6.1 Technology Stack
+Table 2:Technology stack used in ANFIS-LLFSR.
+Layer Technologies Dependencies
+ML Core PyTorch, NumPy torch, scipy
+Backend API FastAPI uvicorn, pydantic
+Frontend React, TypeScript vite, tailwindcss
+Evaluation LPIPS, PyIQA clean-fid
+5.6.2 Testing
+Different unit tests were written to verify model outputs and feature extraction.
+The testing process included ANFIS output validation, image enhancement checks, and
+blur analysis verification.
+Deterministic seeding was also used to make the results reproducible.
+Testing was performed on multiple image samples with different degradation levels.
+Some images contained heavy blur while others mainly suffered from illumination loss.
+This helped evaluate whether the system remained stable under different input condi-
+tions instead of performing well only for a small set of examples.
+Another important observation was that the proposed framework preserved facial sym-
+metry better than baseline interpolation methods. This helped produce outputs that ap-
+peared more realistic to human observers.
+The restoration quality was especially noticeable around eye regions and facial bound-
+aries where low-resolution methods usually lose important details.
+20
+--- Page 26 ---
+6 CONCLUSION
+6.1 Conclusion
+In this project, we developed a hybrid low-light face restoration system using ANFIS and
+deep learning.
+The proposed pipeline was able to improve image brightness, restore facial details, and
+preserve identity more effectively compared to baseline methods.
+Using fuzzy logic for darkness estimation helped the system apply more controlled
+enhancement instead of treating all images in the same way.
+The final results showed improvements in PSNR, SSIM, LPIPS, and face recognition
+accuracy.
+Overall, the project demonstrated that combining interpretable fuzzy systems with deep
+learning can produce reliable results for low-light face restoration.
+6.2 Future Work
+Several improvements can still be made in the future.
+1. Real-time optimization using FAISS.
+2. Video-based face restoration.
+3. Replacing SwinIR with newer transformer architectures.
+4. Federated learning on private datasets.
+5. Better blur kernel estimation methods.
+Another possible improvement would be reducing inference time so that the system can
+work efficiently on mobile devices or embedded systems. Real-time face restoration could
+become useful in surveillance cameras and video conferencing applications.
+Future work could also include testing the framework on larger real-world datasets
+collected under uncontrolled illumination conditions.
+Another possible extension would be integrating diffusion-based restoration models,
+which have recently shown promising performance in image generation and reconstruction
+tasks.
+Further optimization could also improve inference speed and reduce GPU memory us-
+age during deployment.
+REFERENCES
+References
+[1] J.-S. R. Jang, “ANFIS: Adaptive-network-based fuzzy inference system,”IEEE
+Transactions on Systems, Man, and Cybernetics, vol. 23, no. 3, pp. 665–685, 1993.
+21
+--- Page 27 ---
+[2] C. Li et al., “Zero-Reference Deep Curve Estimation for Low-Light Image Enhance-
+ment,” inProceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pp. 1780–1789, 2020.
+[3] J. Liang et al., “SwinIR: Image Restoration Using Swin Transformer,” inProceedings
+of the IEEE/CVF International Conference on Computer Vision Workshops, 2021.
+[4] J. Deng et al., “ArcFace: Additive Angular Margin Loss for Deep Face Recognition,”
+inProceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recog-
+nition, pp. 4690–4699, 2019.
+[5] X. Wang et al., “ESRGAN: Enhanced Super-Resolution Generative Adversarial Net-
+works,” inProceedings of the European Conference on Computer Vision Workshops,
+2018.
+[6] X. Wang et al., “Towards Real-World Blind Face Restoration with Generative Facial
+Prior (GFPGAN),” inProceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition, 2021.
+[7] Z. Liu et al., “Swin Transformer: Hierarchical Vision Transformer using Shifted Win-
+dows,” inProceedings of the IEEE/CVF International Conference on Computer Vi-
+sion, pp. 10012–10022, 2021.
+[8] R. Zhang et al., “The Unreasonable Effectiveness of Deep Features as a Perceptual
+Metric,” inProceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, 2018.
+[9] Z. Liu et al., “Deep Learning Face Attributes in the Wild,” inProceedings of the IEEE
+International Conference on Computer Vision, pp. 3730–3738, 2015.
+[10] S. Woo et al., “CBAM: Convolutional Block Attention Module,” inProceedings of
+the European Conference on Computer Vision, pp. 3–19, 2018.
+[11] Z. Wang et al., “Image Quality Assessment: From Error Visibility to Structural Simi-
+larity,”IEEE Transactions on Image Processing, vol. 13, no. 4, pp. 600–612, 2004.
+22

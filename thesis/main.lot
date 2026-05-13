@@ -1,0 +1,26 @@
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {1.1}{\ignorespaces Degradation Modalities and their Impact on Facial Reconstruction.}}{3}{table.caption.5}%
+\contentsline {table}{\numberline {1.2}{\ignorespaces Exhaustive Literature Review of Image Restoration Paradigms (2010--2024).}}{8}{table.caption.6}%
+\contentsline {table}{\numberline {1.3}{\ignorespaces In-Scope vs. Out-of-Scope Technical Features.}}{10}{table.caption.7}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Detailed System Hyperparameters for ANFIS-LLFSR.}}{20}{table.caption.10}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Performance of static enhancement vs. proposed adaptive system.}}{29}{table.caption.13}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Quantitative comparison on the CelebA test set under compound low-light and blur degradation.}}{30}{table.caption.14}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Performance consistency under varying input noise levels ($\sigma $).}}{32}{table.caption.17}%
+\contentsline {table}{\numberline {3.4}{\ignorespaces Confusion Matrix for ANFIS Illumination Classification.}}{33}{table.caption.19}%
+\contentsline {table}{\numberline {3.5}{\ignorespaces Inference latency vs. Image Resolution on NVIDIA RTX 3090.}}{34}{table.caption.20}%
+\contentsline {table}{\numberline {3.6}{\ignorespaces Ablation study of the proposed modules.}}{34}{table.caption.21}%
+\contentsline {table}{\numberline {3.7}{\ignorespaces Identity similarity across different facial attributes.}}{37}{table.caption.23}%
+\contentsline {table}{\numberline {3.8}{\ignorespaces Exhaustive performance comparison across 10 SOTA methods.}}{38}{table.caption.24}%
+\contentsline {table}{\numberline {3.9}{\ignorespaces Edge device performance benchmarks (512x512 resolution).}}{42}{table.caption.31}%
+\contentsline {table}{\numberline {3.10}{\ignorespaces Mapping results to research objectives.}}{42}{table.caption.32}%
+\contentsline {table}{\numberline {3.11}{\ignorespaces Comparison of different attention modules in the SwinFuzzyLCR refinement stage.}}{42}{table.caption.33}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }

@@ -1,0 +1,103 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\@writefile{toc}{\contentsline {chapter}{\numberline {2}MATHEMATICAL MODELING AND METHODS}{13}{chapter.2}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {2.1}Introduction}{13}{section.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.1}The Evolution of the ANFIS-Swin Hybrid}{13}{subsection.2.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.2}Rejected Architectural Alternatives and Lessons Learned}{13}{subsection.2.1.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2.1}{\ignorespaces End-to-End System Architecture of ANFIS-LLFSR, showing the interaction between the ANFIS Meta-Controller and the SwinFuzzyLCR Restoration Layer.}}{14}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:system_flow}{{2.1}{14}{End-to-End System Architecture of ANFIS-LLFSR, showing the interaction between the ANFIS Meta-Controller and the SwinFuzzyLCR Restoration Layer}{figure.caption.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.2}Data Preprocessing and Feature Extraction}{14}{section.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.1}Statistical Feature Extraction for ANFIS}{14}{subsection.2.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.2}Degradation Analysis and Manifold Visualization}{15}{subsection.2.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.3}Synthetic Degradation Pipeline}{15}{subsection.2.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}Baseline Model Selection and Rationale}{15}{section.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.1}SRCNN: Convolutional Super-Resolution}{16}{subsection.2.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.2}Zero-DCE: Illumination Benchmarking}{16}{subsection.2.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.3}CodeFormer: Structural SOTA}{16}{subsection.2.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}The Neuro-Fuzzy Meta-Controller (ANFIS)}{16}{section.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.1}Fuzzification: Mapping the Darkness Manifold}{16}{subsection.2.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.2}Layer 2: Rule Firing Strength}{17}{subsection.2.4.2}\protected@file@percent }
+\newlabel{eq:firing}{{2.2}{17}{Layer 2: Rule Firing Strength}{equation.2.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.3}Layer 3: Normalization}{17}{subsection.2.4.3}\protected@file@percent }
+\newlabel{eq:norm}{{2.3}{17}{Layer 3: Normalization}{equation.2.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.4}Layer 4: Consequent Layer}{17}{subsection.2.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.5}Defuzzification and Rule Visualization}{18}{subsection.2.4.5}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2.2}{\ignorespaces ANFIS decision surface visualizing the non-linear mapping between Global Intensity ($\mu _I$) and Local Contrast ($\sigma _I$) to the Darkness Factor ($DF$).}}{18}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:anfis_surface}{{2.2}{18}{ANFIS decision surface visualizing the non-linear mapping between Global Intensity ($\mu _I$) and Local Contrast ($\sigma _I$) to the Darkness Factor ($DF$)}{figure.caption.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.6}Premise Parameter Optimization via Gradient Descent}{18}{subsection.2.4.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.7}Consequent Parameter Optimization via Recursive Least Squares (RLS)}{18}{subsection.2.4.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.5}Structural Anchoring via Locality Constrained Representation (LCR)}{19}{section.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.1}LCR Encoding and Sparse Priors}{19}{subsection.2.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.2}Closed-Form Optimization and Complexity Bottlenecks}{19}{subsection.2.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.3}Theoretical Bounds of Sparse Reconstruction in Low-Light}{19}{subsection.2.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.6}System Hyperparameters and Configuration}{19}{section.2.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2.1}{\ignorespaces Detailed System Hyperparameters for ANFIS-LLFSR.}}{20}{table.caption.10}\protected@file@percent }
+\newlabel{tab:hyperparams_detailed}{{2.1}{20}{Detailed System Hyperparameters for ANFIS-LLFSR}{table.caption.10}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.7}Computational Complexity and Runtime Profile}{20}{section.2.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.8}Identity Preservation Theory: The Role of ArcFace}{21}{section.2.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.8.1}Additive Angular Margin Loss}{21}{subsection.2.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.8.2}ArcFace as a Geometric Sentinel}{21}{subsection.2.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.9}Training Procedure and Execution Loop}{21}{section.2.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.9.1}Addressing Training Divergence in Multi-Loss Optimization}{21}{subsection.2.9.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.10}Membership Function Design and Sensitivity Analysis}{22}{section.2.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.10.1}Gaussian vs. Triangular Membership Functions}{22}{subsection.2.10.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.10.2}Impact of MF Overlap}{22}{subsection.2.10.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.11}Recursive Least Squares (RLS) Convergence Properties}{22}{section.2.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.11.1}Analytic Solution vs. Iterative Search}{22}{subsection.2.11.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.12}Transformer-based Feature Refinement}{23}{section.2.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.12.1}Window-based Self-Attention}{23}{subsection.2.12.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.12.2}Shifted Window Partitioning}{23}{subsection.2.12.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.12.3}SwinIR for Super-Resolution}{23}{subsection.2.12.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.12.4}Adaptive Locality Selection Logic}{23}{subsection.2.12.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.12.5}Signal-Dependent Bandwidth Modulation}{23}{subsection.2.12.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.12.6}Weighted Dictionary Sampling}{24}{subsection.2.12.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.12.7}ANFIS-Guided Reweighting}{24}{subsection.2.12.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.13}SwinFuzzyLCR Refinement Network}{24}{section.2.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.13.1}Spatial Feature Transform (SFT)}{24}{subsection.2.13.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.13.2}Convolutional Block Attention Module (CBAM)}{25}{subsection.2.13.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.13.3}Wavelet-Frequency Fusion for Texture Recovery}{25}{subsection.2.13.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.14}Identity Preservation via ArcFace Sentinel}{25}{section.2.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.14.1}ArcFace Embedding Space}{25}{subsection.2.14.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.14.2}Identity Loss Formulation}{26}{subsection.2.14.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.15}Loss Functions}{26}{section.2.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.16}Integrated Inference Workflow and Information Flow}{26}{section.2.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.16.1}Hierarchical Information Flow}{26}{subsection.2.16.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.16.2}Implementation Rationale: Preventing the "Average Face" Problem}{27}{subsection.2.16.2}\protected@file@percent }
+\@setckpt{chapters/chapter2}{
+\setcounter{page}{28}
+\setcounter{equation}{22}
+\setcounter{enumi}{3}
+\setcounter{enumii}{0}
+\setcounter{enumiii}{0}
+\setcounter{enumiv}{0}
+\setcounter{footnote}{0}
+\setcounter{mpfootnote}{0}
+\setcounter{part}{0}
+\setcounter{chapter}{2}
+\setcounter{section}{16}
+\setcounter{subsection}{2}
+\setcounter{subsubsection}{0}
+\setcounter{paragraph}{0}
+\setcounter{subparagraph}{0}
+\setcounter{figure}{2}
+\setcounter{table}{1}
+\setcounter{parentequation}{0}
+\setcounter{section@level}{0}
+\setcounter{Item}{30}
+\setcounter{Hfootnote}{0}
+\setcounter{bookmark@seq@number}{98}
+\setcounter{caption@flags}{2}
+\setcounter{continuedfloat}{0}
+\setcounter{subfigure}{0}
+\setcounter{subtable}{0}
+\setcounter{float@type}{8}
+\setcounter{algorithm}{0}
+\setcounter{ALC@unique}{0}
+\setcounter{ALC@line}{0}
+\setcounter{ALC@rem}{0}
+\setcounter{ALC@depth}{0}
+\setcounter{lofdepth}{1}
+\setcounter{lotdepth}{1}
+}

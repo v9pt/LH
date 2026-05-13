@@ -1,0 +1,34 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {2.1}{\ignorespaces End-to-End System Architecture of ANFIS-LLFSR, showing the interaction between the ANFIS Meta-Controller and the SwinFuzzyLCR Restoration Layer.}}{15}{figure.caption.8}%
+\contentsline {figure}{\numberline {2.2}{\ignorespaces ANFIS decision surface visualizing the non-linear mapping between Global Intensity ($\mu _I$) and Local Contrast ($\sigma _I$) to the Darkness Factor ($DF$).}}{19}{figure.caption.9}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Statistical distribution of attributes in the CelebA-HQ test set, showcasing a diverse mix of gender, age, and initial illumination conditions.}}{29}{figure.caption.11}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Radar chart comparing ANFIS-LLFSR against GFPGAN and CodeFormer across four dimensions: Fidelity (PSNR), Structure (SSIM), Realism (LPIPS), and Identity (ArcFace Sim).}}{30}{figure.caption.12}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces Visual comparison of face restoration on a severe L3 sample. Our method (e) preserves the specific eye shape and lip texture better than generative models (c, d) which tend to "average out" the identity.}}{32}{figure.caption.15}%
+\contentsline {figure}{\numberline {3.4}{\ignorespaces Identity Preservation Heatmap: Darker regions indicate areas of high ArcFace embedding stability. Our model maintains high stability in the periocular and nasal regions even under 4x upsampling.}}{33}{figure.caption.16}%
+\contentsline {figure}{\numberline {3.5}{\ignorespaces Degradation of identity similarity (ArcFace) as a function of sensor noise ($\sigma $). The proposed model exhibits a significantly shallower decay compared to the bicubic baseline.}}{33}{figure.caption.18}%
+\contentsline {figure}{\numberline {3.6}{\ignorespaces 2D FFT Power Spectrum comparison. (a) Raw LR Input showing a collapsed high-frequency tail; (b) GFPGAN showing artificial high-frequency "rings"; (c) Proposed ANFIS-LLFSR showing a natural, broad-spectrum recovery of textural details.}}{37}{figure.caption.22}%
+\contentsline {figure}{\numberline {3.7}{\ignorespaces Restoration of a severe L3 sample ($\gamma =4.2$, $\sigma =0.04$). The input (left) is almost entirely black. The ANFIS module estimated $DF=0.92$, triggering maximal SFT modulation. The LCR hallucination successfully recovered the eye symmetry, which was further polished by the Swin blocks.}}{40}{figure.caption.25}%
+\contentsline {figure}{\numberline {3.8}{\ignorespaces Detailed recovery of thin-rimmed eyeglasses. Traditional CNN models often blur these structures into the skin. Our locality-constrained approach utilizes dictionary atoms containing sharp edge priors to maintain the geometric integrity of the eyewear.}}{40}{figure.caption.26}%
+\contentsline {figure}{\numberline {3.9}{\ignorespaces Profile-view restoration challenge. Side-view faces have fewer pre-aligned dictionary atoms. The model demonstrates robustness to pose variation by utilizing the shifted-window attention of the Swin Transformer to capture the asymmetric lighting profile.}}{41}{figure.caption.27}%
+\contentsline {figure}{\numberline {3.10}{\ignorespaces Analysis of denoising artifacts. In high-ISO noise scenarios, the Wavelet-Frequency fusion block acts as a high-pass filter, removing the stochastic noise components while preserving the underlying facial manifold structure.}}{41}{figure.caption.28}%
+\contentsline {figure}{\numberline {3.11}{\ignorespaces Visualization of the ANFIS decision surface for the "Mean Intensity" vs. "Local Contrast" features. The surface shows a smooth, non-linear mapping that accurately represents the increasing restoration difficulty in low-contrast regions.}}{42}{figure.caption.29}%
+\contentsline {figure}{\numberline {3.12}{\ignorespaces Training loss trajectory. The blue curve represents the total loss, while the orange curve represents the ArcFace identity loss. The "staircase" pattern in the identity loss indicates the moments where the scheduler decreased the learning rate to stabilize the embedding manifold.}}{42}{figure.caption.30}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Visual comparison of ATM vestibule restoration. (Left) Original shadowed input; (Center) GFPGAN hallucination; (Right) Proposed ANFIS-LLFSR result showing preserved identity features.}}{48}{figure.caption.35}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces Forensic Workflow Diagram: From field capture on mobile to cloud-based ANFIS-LLFSR restoration and identity verification.}}{50}{figure.caption.37}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {17.1}{\ignorespaces Hardware topology for a distributed forensic restoration system, showing the load balancer, GPU workers, and the persistent ArcFace identity database.}}{66}{figure.caption.40}%

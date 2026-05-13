@@ -1,0 +1,16 @@
+\begin{center}
+    \large
+    \textbf{ABSTRACT}
+\end{center}
+
+\vspace{1cm}
+
+The restoration of facial images captured under suboptimal illumination—commonly referred to as Low-Light Face Super-Resolution (LLFSR)—is a non-trivial inverse problem characterized by non-linear intensity mapping and signal-dependent noise. While deep learning has significantly advanced general image restoration, existing models often struggle with the "identity drift" phenomenon in forensic contexts, where generative hallucinations can alter subject-specific biometric features.
+
+This thesis proposes \textbf{ANFIS-LLFSR}, a hybrid neuro-fuzzy framework designed for identity-consistent face restoration in uncontrolled low-light environments. The architecture integrates an \textbf{Adaptive Neuro-Fuzzy Inference System (ANFIS)} to serve as an interpretable meta-controller for illumination estimation. By analyzing a 10-dimensional statistical and frequency-domain manifold, ANFIS modulates a deep refinement pipeline via \textbf{Spatial Feature Transform (SFT)} layers. To address the ill-posed nature of textural recovery, we incorporate a **Locality-Constrained Representation (LCR)** module that leverages a coupled LR-HR facial dictionary to hallucinate structural anchor points, anchored by an **ArcFace identity sentinel**.
+
+The final refinement stage utilizes a transformer-based backbone, \textbf{SwinFuzzyLCR}, which employs shifted-window self-attention and \textbf{Wavelet-Frequency Fusion} to recover high-frequency components lost to Poisson-Gaussian noise. Quantitative evaluations on the CelebA-HQ and LFW datasets demonstrate that ANFIS-LLFSR achieves a Peak Signal-to-Noise Ratio (PSNR) of 30.42 dB and a Face Similarity score of 0.758, significantly outperforming state-of-the-art benchmarks such as GFPGAN and CodeFormer in identity preservation. This work provides a mathematically rigorous bridge between symbolic fuzzy reasoning and connectionist deep learning for real-world forensic applications.
+
+\vspace{1cm}
+
+\textbf{Keywords:} Low-Light Face Super-Resolution, Neuro-Fuzzy Systems, ANFIS, Locality Constrained Representation (LCR), Swin Transformer, ArcFace Identity Preservation, Forensic Image Restoration, Wavelet Fusion.

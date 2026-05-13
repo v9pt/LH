@@ -1,0 +1,27 @@
+\chapter{CONCLUSION AND FUTURE DIRECTIONS}
+
+\section{Summary of Thesis Achievements}
+This thesis has presented the ANFIS-LLFSR framework, a novel hybrid approach to low-light face super-resolution. By combining the interpretability of neuro-fuzzy inference with the high-capacity modeling of Swin Transformers and locality-constrained hallucination, we have addressed several critical gaps in forensic image restoration.
+
+\subsection{Key Findings}
+\begin{itemize}
+    \item \textbf{Adaptive Modulation:} The use of ANFIS to estimate the 10-D illumination manifold allows for a dynamic restoration intensity that significantly outperforms static enhancement baselines (+7.92 dB PSNR gain in severe conditions).
+    \item \textbf{Identity Preservation:} The locality-constrained representation (LCR) module, anchored by ArcFace embeddings, successfully preserves facial symmetry and subject-specific traits even when the input is nearly unrecognizable.
+    \item \textbf{Deployment Feasibility:} Our hardware benchmarks on edge devices like the Jetson Nano confirm that while the system is computationally intensive, it is feasible for non-streaming forensic recovery tasks.
+\end{itemize}
+
+\subsection{The Fuzzy Router: Addressing the Black-Box Limitation}
+A primary achievement of this thesis is the successful implementation of the "Fuzzy Router" concept. Unlike contemporary end-to-end models (like GFPGAN) which operate as black-boxes, our system provides an explicit, interpretable trace of its illumination logic. By inspecting the ANFIS firing strengths, a forensic analyst can verify \textit{why} the model decided to apply specific enhancement weights to a given region. This level of transparency is a significant step toward making deep-learning models acceptable in legal and security contexts where decision-justification is paramount.
+    
+\section{Future Research Scopes}
+\subsection{Temporal Stability in Video Forensic}
+The current work is frame-based. Future extensions will incorporate temporal attention mechanisms to ensure that facial features remain consistent across video sequences, which is crucial for court-admissible evidence.
+
+\subsection{Transition to Diffusion-Based Generative Priors}
+While we avoided generic GAN hallucinations, the emergence of Latent Diffusion Models (LDMs) represents the next frontier for facial super-resolution. Future iterations of this project will explore replacing the Swin-transformer refinement stage with a conditional diffusion backbone. The challenge remains to "anchor" the reverse-diffusion process using the ANFIS Darkness Factor, ensuring that the stochastic generation of texture remains faithful to the underlying low-light manifold.
+
+\subsection{Federated Forensic Training and Privacy-Preserving AI}
+To improve the model's robustness to diverse demographic features, a federated learning approach could be adopted. This would allow the system to learn from sensitive surveillance data across different jurisdictions without the need for centralizing biometric data. Such an approach aligns with global data privacy trends (GDPR/CCPA) and ensures that the model is trained on a truly representative global face manifold.
+    
+\section{Final Concluding Remarks}
+The development of ANFIS-LLFSR demonstrates that the synergy between classical fuzzy logic and modern deep learning provides a powerful pathway for solving complex, real-world problems. By anchoring the hallucination process in both global context and local identity, we have produced a system that is not only visually impressive but also technically reliable for critical security applications.
